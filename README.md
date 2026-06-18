@@ -1,4 +1,8 @@
-# GoldFinch
+<p align="center">
+  <img src="docs/icon.png" alt="GoldFinch app icon" width="120" height="120" />
+</p>
+
+<h1 align="center">GoldFinch</h1>
 
 Private, serverless household finance — a self-built Monarch Money replacement.
 Daily bank sync, budgets, recurring detection, reports, goals, investments, CSV
