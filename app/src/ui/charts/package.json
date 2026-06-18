@@ -1,0 +1,12 @@
+{
+  "name": "@goldfinch/ui-charts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GoldFinch chart-kit pure-logic test harness (node:test + StrykerJS over chartMath/chartTheme/categoryColor/seriesColors, per ops/design-spec/charts.md section 12). Lives inside the @goldfinch/app Expo workspace; not an independent npm workspace. Deliberately has NO type:module field: the test compile (tsconfig.test.json, NodeNext) detects CommonJS from this file, which keeps the kit's extensionless relative imports valid for both Metro and the compiled node:test run.",
+  "main": "./index.ts",
+  "scripts": {
+    "test": "tsc -p tsconfig.test.json && node --test dist-test/test/*.test.js",
+    "test:mutation": "npx --yes -p @stryker-mutator/core@9.6.1 -p @stryker-mutator/tap-runner@9.6.1 -- stryker run",
+    "clean": "rm -rf dist-test .stryker-tmp reports *.tsbuildinfo"
+  }
+}

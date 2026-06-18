@@ -1,0 +1,22 @@
+{
+  "// why this file": [
+    "Compiles the pure dashboard lib (heroMath + labels) + node:test suites.",
+    "rootDir is the app workspace root (../..) because heroMath value-imports",
+    "src/lib/dates and labels value-imports src/lib/logger, so the emitted",
+    "tree mirrors app/ under dist-test/ (tests live at",
+    "dist-test/features/dashboard/test/). NodeNext + CommonJS detection (this",
+    "package.json has no type:module) keeps the extensionless relative imports",
+    "valid for both Metro and the compiled node run. The shared logger import",
+    "resolves at runtime through the package's `default` export condition",
+    "(require(esm), node >= 22.12)."
+  ],
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "outDir": "dist-test",
+    "types": ["node"],
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": ["lib/heroMath.ts", "lib/labels.ts", "lib/spend.ts", "test/**/*"]
+}

@@ -1,0 +1,66 @@
+# GoldFinch mutation testing (PHASE7-DECISIONS.md P7-10).
+#
+# StrykerJS over the highest-stakes pure logic in packages/shared (money,
+# keys, dates, cursor, recurrence, rules, budgetMath, csv). Runs WEEKLY, not
+# per-push - a full run mutates ~1200 ways and is deliberately kept out of the
+# PR gate (ci.yml). Thresholds live in packages/shared/stryker.config.json
+# (high 90 / low 80 / break 75); the run FAILS below break, and the team-level
+# bar is >=80 overall with >=85 on money/budgetMath/recurrence.
+#
+# No AWS credentials, no deploy: this is pure compute on the free tier.
+
+name: Mutation testing
+
+on:
+  schedule:
+    # Mondays 09:13 UTC (early US-East morning; odd minute avoids the
+    # top-of-hour scheduling stampede that delays cron jobs).
+    - cron: '13 9 * * 1'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  mutation:
+    name: StrykerJS on packages/shared
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Prove the suite is green before mutating it: a red baseline would make
+      # every mutant "killed" and the score meaningless.
+      - name: Baseline test run
+        run: npm test -w @goldfinch/shared
+
+      # Stryker itself is fetched by npx pinned inside the workspace's
+      # test:mutation script (kept out of package-lock.json on purpose: the
+      # mutation toolchain is not a runtime or build dependency of the
+      # contracts package, and npm ci everywhere else stays untouched).
+      - name: Mutation testing
+        run: npm run test:mutation -w @goldfinch/shared
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: |
+            packages/shared/reports/mutation/
+          retention-days: 90
+          if-no-files-found: warn

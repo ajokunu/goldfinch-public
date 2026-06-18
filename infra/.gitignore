@@ -1,0 +1,4 @@
+cdk.out/
+.synth-stubs/
+node_modules/
+coverage/

@@ -1,0 +1,17 @@
+node_modules/
+dist/
+build/
+cdk.out/
+coverage/
+.expo/
+*.log
+.env
+.env.*
+.DS_Store
+*.tsbuildinfo
+
+# Local-only deploy secrets / PII (real emails, Apple ID, root-creds notes).
+# The committed ops/DEPLOY-CONFIG.md carries placeholders only; the real values
+# live here and must never be committed.
+ops/DEPLOY-CONFIG.local.md
+infra/cdk.context.json

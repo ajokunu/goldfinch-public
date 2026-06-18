@@ -1,0 +1,18 @@
+{
+  "// why this file": [
+    "Compiles ONLY the pure budget money helpers (lib/amounts.ts, type-only",
+    "imports) + their node:test suite, mirroring the src/ui and src/i18n",
+    "harnesses: NodeNext + CommonJS detection (this package.json has no",
+    "type:module), so the extensionless relative imports stay valid for both",
+    "Metro and the compiled node run."
+  ],
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist-test",
+    "types": ["node"],
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": ["lib/amounts.ts", "test/**/*"]
+}

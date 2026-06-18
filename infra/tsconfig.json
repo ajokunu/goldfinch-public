@@ -1,0 +1,26 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "sourceMap": false,
+    "types": ["node", "jest"]
+  },
+  "ts-node": {
+    "transpileOnly": true,
+    // The CDK app runs through ts-node's CommonJS require hook (same module
+    // settings the jest transform uses), and the shared route manifest
+    // (packages/shared, an ESM-scope workspace) must be value-importable at
+    // synth time as the single source of truth for gateway routes. The
+    // moduleTypes override forces those sources to compile/load as CJS.
+    "compilerOptions": {
+      "module": "commonjs",
+      "moduleResolution": "node"
+    },
+    "moduleTypes": {
+      "../packages/shared/src/**/*": "cjs"
+    }
+  },
+  "include": ["bin/**/*.ts", "lib/**/*.ts", "lambda/**/*.ts", "test/**/*.ts"],
+  "exclude": ["node_modules", "cdk.out", ".synth-stubs"]
+}

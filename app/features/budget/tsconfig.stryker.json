@@ -1,0 +1,27 @@
+{
+  "// why this file": [
+    "Build config used ONLY by the app-level Stryker run (app/stryker.config.json",
+    "buildCommand). Self-contained (no `extends`) because the sandbox copy of",
+    "app/ breaks the ../../../tsconfig.base.json chain. noCheck so type-invalid",
+    "mutants still emit and must be killed by tests, not the compiler."
+  ],
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "declaration": false,
+    "sourceMap": false,
+    "noCheck": true,
+    "types": ["node"],
+    "rootDir": ".",
+    "outDir": "dist-test"
+  },
+  "include": ["lib/amounts.ts", "test/**/*"]
+}

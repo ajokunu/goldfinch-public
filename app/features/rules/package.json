@@ -1,0 +1,18 @@
+{
+  "name": "@goldfinch/feature-rules",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GoldFinch rules engine UI (P7-5): rule list in evaluation order, editor with matchType/pattern/amount-bounds/category, live preview against recent transactions via the shared matcher, apply-now with result counts, delete. Lives inside the @goldfinch/app Expo workspace; not an independent npm workspace.",
+  "main": "./index.tsx",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@goldfinch/shared": "*",
+    "@tanstack/react-query": "^5.59.16",
+    "lucide-react-native": "^0.511.0",
+    "react": "19.1.0",
+    "react-native": "0.81.4"
+  }
+}

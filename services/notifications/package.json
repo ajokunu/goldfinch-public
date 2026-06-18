@@ -1,0 +1,34 @@
+{
+  "name": "@goldfinch/notifications",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GoldFinch notifications service: Expo Push relay for sync-complete and budget-threshold events, plus the scheduled push-receipt sweep.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p tsconfig.json && node --test dist/*.test.js",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.600.0",
+    "@aws-sdk/client-ssm": "^3.600.0",
+    "@aws-sdk/lib-dynamodb": "^3.600.0",
+    "@goldfinch/shared": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

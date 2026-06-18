@@ -1,0 +1,19 @@
+{
+  "name": "@goldfinch/feature-import",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GoldFinch CSV import feature (P7-6): file pick via the shell FilePicker, local papaparse parsing, interactive column mapping with normalized preview rows, target account selection with inline manual-account creation, batched POST /import/transactions with progress, and a per-row error report (no silently dropped rows). Lives inside the @goldfinch/app Expo workspace; not an independent npm workspace.",
+  "main": "./index.tsx",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@goldfinch/shared": "*",
+    "@tanstack/react-query": "^5.59.16",
+    "lucide-react-native": "^0.469.0",
+    "papaparse": "^5.5.0",
+    "react": "19.1.0",
+    "react-native": "0.81.4"
+  }
+}

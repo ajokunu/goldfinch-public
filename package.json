@@ -1,0 +1,25 @@
+{
+  "name": "goldfinch",
+  "private": true,
+  "version": "0.1.0",
+  "description": "GoldFinch - private serverless personal-finance app for two users on AWS",
+  "workspaces": [
+    "packages/*",
+    "services/*",
+    "infra",
+    "app"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "playwright test --config e2e/playwright.config.ts",
+    "synth": "npm run synth --workspace infra"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
+  }
+}

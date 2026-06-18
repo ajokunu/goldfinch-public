@@ -1,0 +1,35 @@
+{
+  "app": "npx ts-node --prefer-ts-exts bin/goldfinch.ts",
+  "watch": {
+    "include": [
+      "bin/**",
+      "lib/**",
+      "lambda/**"
+    ],
+    "exclude": [
+      "node_modules",
+      "cdk.out",
+      "test",
+      ".synth-stubs"
+    ]
+  },
+  "context": {
+    "env": "prod",
+    "goldfinch:cognitoDomainPrefix": "goldfinch-login",
+    "goldfinch:relyingPartyId": "",
+    "_comment:goldfinch:localDevOverride": "PROD trust surface: callbackUrls/logoutUrls/webOrigins below trust ONLY the CloudFront origin and the goldfinch:// native scheme. No plaintext http://localhost is committed here, so prod is never widened to a dev machine. For local web dev (Expo on http://localhost:8081 / :19006), re-add localhost via a NON-COMMITTED override (e.g. cdk.context.json or -c goldfinch:webOrigins=...,http://localhost:8081 / -c goldfinch:callbackUrls / -c goldfinch:logoutUrls). Native sign-in via Expo dev client uses the goldfinch:// scheme and needs no localhost.",
+    "goldfinch:callbackUrls": "goldfinch://callback,https://d38nsjbqmk44hx.cloudfront.net/callback",
+    "goldfinch:logoutUrls": "goldfinch://signout,https://d38nsjbqmk44hx.cloudfront.net",
+    "goldfinch:webOrigins": "https://d38nsjbqmk44hx.cloudfront.net",
+    "goldfinch:aiEnabled": true,
+    "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
+    "@aws-cdk/core:checkSecretUsage": true,
+    "@aws-cdk/aws-iam:minimizePolicies": true,
+    "@aws-cdk/core:validateSnapshotRemovalPolicy": true,
+    "@aws-cdk/aws-s3:createDefaultLoggingPolicy": true,
+    "@aws-cdk/aws-apigateway:disableCloudWatchRole": true,
+    "@aws-cdk/core:enablePartitionLiterals": true,
+    "@aws-cdk/aws-iam:standardizedServicePrincipals": true,
+    "@aws-cdk/aws-s3:eventBridgeNotificationToSameBucketRegion": true
+  }
+}

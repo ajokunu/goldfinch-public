@@ -1,0 +1,730 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`NotificationsStack snapshot 1`] = `
+{
+  "Metadata": {
+    "cdk_nag": {
+      "rules_to_suppress": [
+        {
+          "id": "AwsSolutions-SQS3",
+          "reason": "This queue IS the dead-letter queue for the notification pipeline; a DLQ for the DLQ adds nothing.",
+        },
+        {
+          "id": "AwsSolutions-IAM4",
+          "reason": "Lambdas use the AWS-managed AWSLambdaBasicExecutionRole policy for CloudWatch Logs only.",
+        },
+        {
+          "id": "AwsSolutions-L1",
+          "reason": "Runtime is pinned to the Node LTS that the esbuild bundling target (node22) matches; upgrades happen deliberately in lockstep.",
+        },
+      ],
+    },
+  },
+  "Outputs": {
+    "NotificationsDlqUrl": {
+      "Value": {
+        "Ref": "NotificationsDlq12302AF4",
+      },
+    },
+    "NotificationsEventsFnArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "NotificationsEventsFn08110DE6",
+          "Arn",
+        ],
+      },
+    },
+    "NotificationsReceiptsFnArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "NotificationsReceiptsFnF0237C93",
+          "Arn",
+        ],
+      },
+    },
+  },
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "NotificationsDlq12302AF4": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "MessageRetentionPeriod": 1209600,
+        "QueueName": "goldfinch-notifications-dlq-prod",
+        "SqsManagedSseEnabled": true,
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "notifications",
+          },
+        ],
+      },
+      "Type": "AWS::SQS::Queue",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "NotificationsDlqAlarm98FE2E02": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Fn::ImportValue": "GoldFinch-Sync-test:ExportsOutputRefAlertsTopic3414BE910C2DFF03",
+          },
+        ],
+        "AlarmDescription": "A notification invocation failed terminally and landed in the DLQ",
+        "AlarmName": "goldfinch-notifications-dlq-prod",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "Dimensions": [
+          {
+            "Name": "QueueName",
+            "Value": {
+              "Fn::GetAtt": [
+                "NotificationsDlq12302AF4",
+                "QueueName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "ApproximateNumberOfMessagesVisible",
+        "Namespace": "AWS/SQS",
+        "Period": 300,
+        "Statistic": "Maximum",
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "notifications",
+          },
+        ],
+        "Threshold": 1,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "NotificationsDlqPolicy32ED0B08": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sqs:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*",
+              },
+              "Resource": {
+                "Fn::GetAtt": [
+                  "NotificationsDlq12302AF4",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": "sqs:SendMessage",
+              "Condition": {
+                "ArnEquals": {
+                  "aws:SourceArn": {
+                    "Fn::GetAtt": [
+                      "SyncCompletedRule57D94110",
+                      "Arn",
+                    ],
+                  },
+                },
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "events.amazonaws.com",
+              },
+              "Resource": {
+                "Fn::GetAtt": [
+                  "NotificationsDlq12302AF4",
+                  "Arn",
+                ],
+              },
+              "Sid": "AllowEventRuleGoldFinchNotificationstestSyncCompletedRuleC46E46F8",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Queues": [
+          {
+            "Ref": "NotificationsDlq12302AF4",
+          },
+        ],
+      },
+      "Type": "AWS::SQS::QueuePolicy",
+    },
+    "NotificationsErrorsAlarm76BAB8B8": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Fn::ImportValue": "GoldFinch-Sync-test:ExportsOutputRefAlertsTopic3414BE910C2DFF03",
+          },
+        ],
+        "AlarmDescription": "The notifications events Lambda reported one or more errors in the last six hours",
+        "AlarmName": "goldfinch-notifications-errors-prod",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "NotificationsEventsFn08110DE6",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "Errors",
+        "Namespace": "AWS/Lambda",
+        "Period": 21600,
+        "Statistic": "Sum",
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "notifications",
+          },
+        ],
+        "Threshold": 1,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "NotificationsEventsFn08110DE6": {
+      "DependsOn": [
+        "NotificationsEventsFnServiceRoleDefaultPolicy5DF5D4E2",
+        "NotificationsEventsFnServiceRoleE2DB9186",
+      ],
+      "Properties": {
+        "Architectures": [
+          "arm64",
+        ],
+        "Code": {
+          "S3Bucket": "cdk-hnb659fds-assets-111111111111-us-east-1",
+          "S3Key": "fa3430e3ac2027d9d7c3520d30ee53456d16e9fdfc0aea03423d52f6aa2163b6.zip",
+        },
+        "Description": "GoldFinch push notifications: SyncCompleted/budget-threshold events -> Expo push",
+        "Environment": {
+          "Variables": {
+            "EXPO_ACCESS_TOKEN_PARAM": "/goldfinch/prod/expo/access-token",
+            "TABLE_NAME": {
+              "Fn::ImportValue": "GoldFinch-Data-test:ExportsOutputRefGoldFinchTable13747E22DF051311",
+            },
+          },
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogGroup": {
+            "Ref": "NotificationsEventsFnLogs4BEBF0D3",
+          },
+        },
+        "MemorySize": 256,
+        "Role": {
+          "Fn::GetAtt": [
+            "NotificationsEventsFnServiceRoleE2DB9186",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs22.x",
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "notifications",
+          },
+        ],
+        "Timeout": 30,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "NotificationsEventsFnEventInvokeConfigA5F002AD": {
+      "Properties": {
+        "DestinationConfig": {
+          "OnFailure": {
+            "Destination": {
+              "Fn::GetAtt": [
+                "NotificationsDlq12302AF4",
+                "Arn",
+              ],
+            },
+          },
+        },
+        "FunctionName": {
+          "Ref": "NotificationsEventsFn08110DE6",
+        },
+        "Qualifier": "$LATEST",
+      },
+      "Type": "AWS::Lambda::EventInvokeConfig",
+    },
+    "NotificationsEventsFnLogs4BEBF0D3": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "RetentionInDays": 30,
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "notifications",
+          },
+        ],
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "NotificationsEventsFnServiceRoleDefaultPolicy5DF5D4E2": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "sqs:SendMessage",
+                "sqs:GetQueueAttributes",
+                "sqs:GetQueueUrl",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "NotificationsDlq12302AF4",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": [
+                "dynamodb:DeleteItem",
+                "dynamodb:PutItem",
+                "dynamodb:Query",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::ImportValue": "GoldFinch-Data-test:ExportsOutputFnGetAttGoldFinchTable13747E22Arn5BDEB372",
+              },
+              "Sid": "GoldFinchTableNotificationsAccess",
+            },
+            {
+              "Action": "ssm:GetParameter",
+              "Effect": "Allow",
+              "Resource": "arn:aws:ssm:us-east-1:111111111111:parameter/goldfinch/prod/expo/access-token",
+              "Sid": "ReadExpoAccessTokenParam",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "NotificationsEventsFnServiceRoleDefaultPolicy5DF5D4E2",
+        "Roles": [
+          {
+            "Ref": "NotificationsEventsFnServiceRoleE2DB9186",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "NotificationsEventsFnServiceRoleE2DB9186": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "notifications",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "NotificationsReceiptsFnEventInvokeConfigC8A09259": {
+      "Properties": {
+        "DestinationConfig": {
+          "OnFailure": {
+            "Destination": {
+              "Fn::GetAtt": [
+                "NotificationsDlq12302AF4",
+                "Arn",
+              ],
+            },
+          },
+        },
+        "FunctionName": {
+          "Ref": "NotificationsReceiptsFnF0237C93",
+        },
+        "MaximumRetryAttempts": 0,
+        "Qualifier": "$LATEST",
+      },
+      "Type": "AWS::Lambda::EventInvokeConfig",
+    },
+    "NotificationsReceiptsFnF0237C93": {
+      "DependsOn": [
+        "NotificationsReceiptsFnServiceRoleDefaultPolicyAC876906",
+        "NotificationsReceiptsFnServiceRole57BDE6DA",
+      ],
+      "Properties": {
+        "Architectures": [
+          "arm64",
+        ],
+        "Code": {
+          "S3Bucket": "cdk-hnb659fds-assets-111111111111-us-east-1",
+          "S3Key": "ce7471de4ffb9fd186b01e8b9e585bc53371f44f797587b9eb41c56edcad0e62.zip",
+        },
+        "Description": "GoldFinch push receipt sweep: prunes DeviceNotRegistered Expo tokens",
+        "Environment": {
+          "Variables": {
+            "EXPO_ACCESS_TOKEN_PARAM": "/goldfinch/prod/expo/access-token",
+            "TABLE_NAME": {
+              "Fn::ImportValue": "GoldFinch-Data-test:ExportsOutputRefGoldFinchTable13747E22DF051311",
+            },
+          },
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogGroup": {
+            "Ref": "NotificationsReceiptsFnLogs56923726",
+          },
+        },
+        "MemorySize": 256,
+        "Role": {
+          "Fn::GetAtt": [
+            "NotificationsReceiptsFnServiceRole57BDE6DA",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs22.x",
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "notifications",
+          },
+        ],
+        "Timeout": 60,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "NotificationsReceiptsFnLogs56923726": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "RetentionInDays": 30,
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "notifications",
+          },
+        ],
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "NotificationsReceiptsFnServiceRole57BDE6DA": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "notifications",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "NotificationsReceiptsFnServiceRoleDefaultPolicyAC876906": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "sqs:SendMessage",
+                "sqs:GetQueueAttributes",
+                "sqs:GetQueueUrl",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "NotificationsDlq12302AF4",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": [
+                "dynamodb:DeleteItem",
+                "dynamodb:PutItem",
+                "dynamodb:Query",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::ImportValue": "GoldFinch-Data-test:ExportsOutputFnGetAttGoldFinchTable13747E22Arn5BDEB372",
+              },
+              "Sid": "GoldFinchTableNotificationsAccess",
+            },
+            {
+              "Action": "ssm:GetParameter",
+              "Effect": "Allow",
+              "Resource": "arn:aws:ssm:us-east-1:111111111111:parameter/goldfinch/prod/expo/access-token",
+              "Sid": "ReadExpoAccessTokenParam",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "NotificationsReceiptsFnServiceRoleDefaultPolicyAC876906",
+        "Roles": [
+          {
+            "Ref": "NotificationsReceiptsFnServiceRole57BDE6DA",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "ReceiptSweepSchedule": {
+      "Properties": {
+        "Description": "Expo push receipt sweep, 15 minutes after the daily sync",
+        "FlexibleTimeWindow": {
+          "Mode": "OFF",
+        },
+        "Name": "goldfinch-receipt-sweep-prod",
+        "ScheduleExpression": "cron(15 9 * * ? *)",
+        "ScheduleExpressionTimezone": "America/New_York",
+        "State": "ENABLED",
+        "Target": {
+          "Arn": {
+            "Fn::GetAtt": [
+              "NotificationsReceiptsFnF0237C93",
+              "Arn",
+            ],
+          },
+          "DeadLetterConfig": {
+            "Arn": {
+              "Fn::GetAtt": [
+                "NotificationsDlq12302AF4",
+                "Arn",
+              ],
+            },
+          },
+          "RetryPolicy": {
+            "MaximumEventAgeInSeconds": 3600,
+            "MaximumRetryAttempts": 3,
+          },
+          "RoleArn": {
+            "Fn::GetAtt": [
+              "SchedulerRole59E73443",
+              "Arn",
+            ],
+          },
+        },
+      },
+      "Type": "AWS::Scheduler::Schedule",
+    },
+    "SchedulerRole59E73443": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": "111111111111",
+                },
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "scheduler.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Description": "Lets EventBridge Scheduler invoke the receipt-sweep Lambda and dead-letter to SQS",
+        "RoleName": "GoldFinch-NotificationsScheduler-prod",
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "notifications",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "SchedulerRoleDefaultPolicy66F774B8": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "NotificationsReceiptsFnF0237C93",
+                  "Arn",
+                ],
+              },
+              "Sid": "InvokeReceiptsFn",
+            },
+            {
+              "Action": [
+                "sqs:SendMessage",
+                "sqs:GetQueueAttributes",
+                "sqs:GetQueueUrl",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "NotificationsDlq12302AF4",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "SchedulerRoleDefaultPolicy66F774B8",
+        "Roles": [
+          {
+            "Ref": "SchedulerRole59E73443",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "SyncCompletedRule57D94110": {
+      "Properties": {
+        "Description": "Routes goldfinch.sync SyncCompleted events to the notifications Lambda",
+        "EventPattern": {
+          "detail-type": [
+            "SyncCompleted",
+          ],
+          "source": [
+            "goldfinch.sync",
+          ],
+        },
+        "Name": "goldfinch-sync-completed-prod",
+        "State": "ENABLED",
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "notifications",
+          },
+        ],
+        "Targets": [
+          {
+            "Arn": {
+              "Fn::GetAtt": [
+                "NotificationsEventsFn08110DE6",
+                "Arn",
+              ],
+            },
+            "DeadLetterConfig": {
+              "Arn": {
+                "Fn::GetAtt": [
+                  "NotificationsDlq12302AF4",
+                  "Arn",
+                ],
+              },
+            },
+            "Id": "Target0",
+            "RetryPolicy": {
+              "MaximumEventAgeInSeconds": 3600,
+              "MaximumRetryAttempts": 2,
+            },
+          },
+        ],
+      },
+      "Type": "AWS::Events::Rule",
+    },
+    "SyncCompletedRuleAllowEventRuleGoldFinchNotificationstestNotificationsEventsFn5A3A438C6CA41308": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "NotificationsEventsFn08110DE6",
+            "Arn",
+          ],
+        },
+        "Principal": "events.amazonaws.com",
+        "SourceArn": {
+          "Fn::GetAtt": [
+            "SyncCompletedRule57D94110",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;

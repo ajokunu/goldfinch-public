@@ -1,0 +1,6 @@
+# StrykerJS mutation-testing artifacts (npm run test:mutation).
+# reports/ holds the html/json reports AND the incremental-mode cache
+# (reports/stryker-incremental.json) - machine-local, never committed.
+.stryker-tmp/
+reports/
+stryker.log

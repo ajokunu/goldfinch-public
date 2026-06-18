@@ -1,0 +1,19 @@
+{
+  "// why this file": [
+    "Compiles the pure reports label helpers (lib/labels.ts) + node:test",
+    "suite. rootDir is the app workspace root (../..) because labels.ts",
+    "type-imports Lang from src/i18n/strings, which lands in the program and",
+    "is emitted under dist-test/src/. NodeNext + CommonJS detection (this",
+    "package.json has no type:module) keeps extensionless relative imports",
+    "valid for both Metro and the compiled node run."
+  ],
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "outDir": "dist-test",
+    "types": ["node"],
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": ["lib/labels.ts", "test/**/*"]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@goldfinch/recurring-feature",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GoldFinch recurring feature (P7-1: detected-series review, upcoming bills, dashboard card). Lives inside the @goldfinch/app workspace; dependencies are owned by app/package.json.",
+  "main": "index.tsx",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

@@ -1,0 +1,85 @@
+# GoldFinch CI (master plan part 18, step 17).
+#
+# Gates every PR (and pushes to main) on: workspace builds, strict
+# typechecking, the full test suite (including the cross-workspace
+# contract-drift suite in packages/testing), and a clean CDK synth.
+#
+# Everything runs on the GitHub-hosted free tier; no AWS credentials are
+# configured and none are needed: cdk synth is credential-free (account-
+# agnostic env, esbuild local bundling) and all tests run against in-process
+# fakes. Deploys are deliberately NOT part of CI (no always-on test stack).
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-typecheck-test:
+    name: Build, typecheck, test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Build @goldfinch/shared first: every other workspace compiles against
+      # its dist/ output, and npm's --workspaces ordering is not guaranteed to
+      # be topological across npm versions.
+      - name: Build shared contracts
+        run: npm run build -w @goldfinch/shared
+
+      # Then build everything: dependents typecheck and test against the built
+      # dist/ of @goldfinch/shared, and packages/testing imports the built
+      # @goldfinch/api and @goldfinch/sync implementations directly.
+      - name: Build all workspaces
+        run: npm run build
+
+      - name: Typecheck all workspaces
+        run: npm run typecheck
+
+      - name: Test all workspaces
+        run: npm test
+
+  cdk-synth:
+    name: CDK synth
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # NodejsFunction bundles the service handlers at synth time and resolves
+      # their @goldfinch/shared imports against the built dist/.
+      - name: Build shared contracts
+        run: npm run build -w @goldfinch/shared
+
+      - name: Synthesize all stacks (cost guardrail + cdk-nag enforced)
+        run: npm run synth

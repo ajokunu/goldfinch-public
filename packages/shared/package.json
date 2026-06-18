@@ -1,0 +1,105 @@
+{
+  "name": "@goldfinch/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared contracts for GoldFinch: entity types, API DTOs, DynamoDB key builders, money helpers, SimpleFIN client, and cursor codec.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/types/index.js"
+    },
+    "./keys": {
+      "types": "./dist/keys.d.ts",
+      "import": "./dist/keys.js"
+    },
+    "./money": {
+      "types": "./dist/money.d.ts",
+      "import": "./dist/money.js"
+    },
+    "./simplefin": {
+      "types": "./dist/simplefin.d.ts",
+      "import": "./dist/simplefin.js"
+    },
+    "./cursor": {
+      "types": "./dist/cursor.d.ts",
+      "import": "./dist/cursor.js"
+    },
+    "./dates": {
+      "types": "./dist/dates.d.ts",
+      "import": "./dist/dates.js"
+    },
+    "./constants": {
+      "types": "./dist/constants.d.ts",
+      "import": "./dist/constants.js"
+    },
+    "./recurrence": {
+      "types": "./dist/recurrence.d.ts",
+      "import": "./dist/recurrence.js"
+    },
+    "./rules": {
+      "types": "./dist/rules.d.ts",
+      "import": "./dist/rules.js"
+    },
+    "./budgetMath": {
+      "types": "./dist/budgetMath.d.ts",
+      "import": "./dist/budgetMath.js"
+    },
+    "./holdingBasis": {
+      "types": "./dist/holdingBasis.d.ts",
+      "import": "./dist/holdingBasis.js"
+    },
+    "./holdingReturn": {
+      "types": "./dist/holdingReturn.d.ts",
+      "import": "./dist/holdingReturn.js"
+    },
+    "./csv": {
+      "types": "./dist/csv.d.ts",
+      "import": "./dist/csv.js"
+    },
+    "./logger": {
+      "types": "./dist/logger.d.ts",
+      "import": "./dist/logger.js",
+      "default": "./dist/logger.js"
+    },
+    "./accountTypes": {
+      "types": "./dist/accountTypes.d.ts",
+      "import": "./dist/accountTypes.js"
+    },
+    "./categoryStyle": {
+      "types": "./dist/categoryStyle.d.ts",
+      "import": "./dist/categoryStyle.js"
+    },
+    "./profile": {
+      "types": "./dist/profile.d.ts",
+      "default": "./dist/profile.js"
+    },
+    "./periodWindow": {
+      "types": "./dist/periodWindow.d.ts",
+      "import": "./dist/periodWindow.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.test.json && node --test dist-test/test/*.test.js",
+    "test:mutation": "npx --yes -p @stryker-mutator/core@9.6.1 -p @stryker-mutator/tap-runner@9.6.1 -- stryker run",
+    "clean": "rm -rf dist dist-test .stryker-tmp reports"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

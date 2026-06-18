@@ -1,0 +1,34 @@
+{
+  "name": "@goldfinch/sync",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GoldFinch daily SimpleFIN sync Lambda: pulls accounts/transactions from the SimpleFIN Bridge and idempotently upserts them into the DynamoDB single table.",
+  "type": "module",
+  "main": "./dist/handler.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.typecheck.json",
+    "test": "vitest run",
+    "claim-token": "tsx scripts/claim-simplefin-token.ts",
+    "verify-simplefin": "tsx scripts/verify-simplefin.ts",
+    "backfill-dates": "tsx scripts/backfill-transacted-date.ts",
+    "fix-contributions": "tsx scripts/fix-retirement-contributions.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.600.0",
+    "@aws-sdk/client-eventbridge": "^3.600.0",
+    "@aws-sdk/client-ssm": "^3.600.0",
+    "@aws-sdk/lib-dynamodb": "^3.600.0",
+    "@goldfinch/shared": "*"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.140",
+    "@types/node": "^20.14.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

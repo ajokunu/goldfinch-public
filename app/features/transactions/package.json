@@ -1,0 +1,22 @@
+{
+  "name": "@goldfinch/feature-transactions",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GoldFinch transactions feature (master plan section 14): FlashList infinite list, filters, search, detail + category reassignment. Lives inside the @goldfinch/app Expo workspace; not an independent npm workspace.",
+  "type": "module",
+  "main": "./index.tsx",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.test.json && node --test dist-test/test/*.test.js",
+    "clean": "rm -rf dist-test"
+  },
+  "dependencies": {
+    "@goldfinch/shared": "*",
+    "@shopify/flash-list": "~2.0.2",
+    "@tanstack/react-query": "^5.59.16",
+    "lucide-react-native": "^0.469.0",
+    "react": "19.1.0",
+    "react-native": "0.81.4"
+  }
+}

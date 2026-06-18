@@ -1,0 +1,56 @@
+{
+  "cli": {
+    "version": ">= 13.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "channel": "development",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://rya92vtrt3.execute-api.us-east-1.amazonaws.com",
+        "EXPO_PUBLIC_COGNITO_DOMAIN": "https://goldfinch-login.auth.us-east-1.amazoncognito.com",
+        "EXPO_PUBLIC_COGNITO_CLIENT_ID": "4l7isp37vh76mu4eqvr32ck8i8"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://rya92vtrt3.execute-api.us-east-1.amazonaws.com",
+        "EXPO_PUBLIC_COGNITO_DOMAIN": "https://goldfinch-login.auth.us-east-1.amazoncognito.com",
+        "EXPO_PUBLIC_COGNITO_CLIENT_ID": "4l7isp37vh76mu4eqvr32ck8i8"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "channel": "production",
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://rya92vtrt3.execute-api.us-east-1.amazonaws.com",
+        "EXPO_PUBLIC_COGNITO_DOMAIN": "https://goldfinch-login.auth.us-east-1.amazoncognito.com",
+        "EXPO_PUBLIC_COGNITO_CLIENT_ID": "4l7isp37vh76mu4eqvr32ck8i8"
+      }
+    },
+    "production-apk": {
+      "extends": "production",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "<ASC_APP_ID>"
+      }
+    }
+  }
+}

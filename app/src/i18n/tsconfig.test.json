@@ -1,0 +1,29 @@
+{
+  // Test build for the PURE i18n modules only (strings/translate/resolve/
+  // messages) plus their node:test suites. The React/IO halves (useT.ts,
+  // systemLocale.ts, index.ts) are excluded: they import react, zustand, and
+  // the app logger, and are exercised through the app typecheck and the
+  // jest-expo/RTL integration layer instead.
+  //
+  // Module/moduleResolution override CommonJS/node10 on purpose: the source
+  // files use extensionless relative imports (what Metro and the app's
+  // bundler-resolution tsconfig expect), which NodeNext ESM output cannot
+  // express. CJS output lets `node --test` resolve them as-is.
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "node10",
+    "rootDir": ".",
+    "outDir": "dist-test",
+    "types": ["node"],
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": [
+    "strings.ts",
+    "translate.ts",
+    "resolve.ts",
+    "messages.ts",
+    "test/**/*"
+  ]
+}

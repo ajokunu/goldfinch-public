@@ -1,0 +1,21 @@
+{
+  "name": "@goldfinch/feature-goals",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GoldFinch savings-goals feature (P7-2): goals list with progress bars and projected-completion dates, create/edit with linked-account or manual funding, contributions flow, delete with confirm. Lives inside the @goldfinch/app Expo workspace; not an independent npm workspace.",
+  "type": "module",
+  "main": "./index.tsx",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.test.json && node --test dist-test/test/*.test.js",
+    "clean": "rm -rf dist-test"
+  },
+  "dependencies": {
+    "@goldfinch/shared": "*",
+    "@tanstack/react-query": "^5.59.16",
+    "lucide-react-native": "^0.511.0",
+    "react": "19.1.0",
+    "react-native": "0.81.4"
+  }
+}

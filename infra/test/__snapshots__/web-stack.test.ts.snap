@@ -1,0 +1,366 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`WebStack snapshot 1`] = `
+{
+  "Metadata": {
+    "cdk_nag": {
+      "rules_to_suppress": [
+        {
+          "id": "AwsSolutions-S1",
+          "reason": "Server access logging for a two-user private SPA bucket adds cost with no review value; CloudFront serves all traffic and the bucket allows only the OAC principal.",
+        },
+        {
+          "id": "AwsSolutions-CFR1",
+          "reason": "Geo restrictions are unnecessary for a private two-user application behind Cognito.",
+        },
+        {
+          "id": "AwsSolutions-CFR2",
+          "reason": "WAF carries a monthly base charge that violates the cost model; the app is JWT-gated and the distribution serves only static assets.",
+        },
+        {
+          "id": "AwsSolutions-CFR3",
+          "reason": "CloudFront access logging is disabled for cost discipline at two-user traffic.",
+        },
+        {
+          "id": "AwsSolutions-CFR4",
+          "reason": "The distribution uses the default CloudFront certificate until the custom domain (decision D3) is attached; the default certificate does not support configuring the minimum TLS protocol version.",
+        },
+        {
+          "id": "AwsSolutions-CFR7",
+          "reason": "Origin Access Control IS configured via S3BucketOrigin.withOriginAccessControl.",
+        },
+      ],
+    },
+  },
+  "Outputs": {
+    "DistributionDomainName": {
+      "Value": {
+        "Fn::GetAtt": [
+          "WebDistribution59C46482",
+          "DomainName",
+        ],
+      },
+    },
+    "DistributionId": {
+      "Value": {
+        "Ref": "WebDistribution59C46482",
+      },
+    },
+    "WebBucketName": {
+      "Value": {
+        "Ref": "WebBucket12880F5B",
+      },
+    },
+  },
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "SpaRewriteFnC71860EB": {
+      "Properties": {
+        "AutoPublish": true,
+        "FunctionCode": "// CloudFront Function (viewer-request): rewrite extensionless paths to
+// /index.html so SPA deep links (e.g. /transactions/2026-06) survive refresh.
+// Asset requests (anything with a dot in the last path segment) pass through.
+function handler(event) {
+  var request = event.request;
+  var uri = request.uri;
+  var lastSegment = uri.split('/').pop();
+  if (lastSegment && lastSegment.indexOf('.') !== -1) {
+    return request;
+  }
+  request.uri = '/index.html';
+  return request;
+}
+",
+        "FunctionConfig": {
+          "Comment": "Rewrites extensionless paths to /index.html for SPA deep links",
+          "Runtime": "cloudfront-js-1.0",
+        },
+        "Name": "goldfinch-spa-rewrite-prod",
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "web",
+          },
+        ],
+      },
+      "Type": "AWS::CloudFront::Function",
+    },
+    "WebBucket12880F5B": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256",
+              },
+            },
+          ],
+        },
+        "BucketName": "goldfinch-web-111111111111-us-east-1",
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true,
+        },
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "web",
+          },
+        ],
+        "VersioningConfiguration": {
+          "Status": "Enabled",
+        },
+      },
+      "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "WebBucketPolicy95D08FAA": {
+      "Properties": {
+        "Bucket": {
+          "Ref": "WebBucket12880F5B",
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*",
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "WebBucket12880F5B",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "WebBucket12880F5B",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": "s3:GetObject",
+              "Condition": {
+                "StringEquals": {
+                  "AWS:SourceArn": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":cloudfront::",
+                        {
+                          "Ref": "AWS::AccountId",
+                        },
+                        ":distribution/",
+                        {
+                          "Ref": "WebDistribution59C46482",
+                        },
+                      ],
+                    ],
+                  },
+                },
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudfront.amazonaws.com",
+              },
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "WebBucket12880F5B",
+                        "Arn",
+                      ],
+                    },
+                    "/*",
+                  ],
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::S3::BucketPolicy",
+    },
+    "WebDistribution59C46482": {
+      "Properties": {
+        "DistributionConfig": {
+          "Comment": "GoldFinch web (prod)",
+          "CustomErrorResponses": [
+            {
+              "ErrorCachingMinTTL": 60,
+              "ErrorCode": 403,
+              "ResponseCode": 200,
+              "ResponsePagePath": "/index.html",
+            },
+            {
+              "ErrorCachingMinTTL": 60,
+              "ErrorCode": 404,
+              "ResponseCode": 200,
+              "ResponsePagePath": "/index.html",
+            },
+          ],
+          "DefaultCacheBehavior": {
+            "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6",
+            "Compress": true,
+            "FunctionAssociations": [
+              {
+                "EventType": "viewer-request",
+                "FunctionARN": {
+                  "Fn::GetAtt": [
+                    "SpaRewriteFnC71860EB",
+                    "FunctionARN",
+                  ],
+                },
+              },
+            ],
+            "ResponseHeadersPolicyId": {
+              "Ref": "WebSecurityHeaders14D3AC48",
+            },
+            "TargetOriginId": "GoldFinchWebtestWebDistributionOrigin15B0FC6F7",
+            "ViewerProtocolPolicy": "redirect-to-https",
+          },
+          "DefaultRootObject": "index.html",
+          "Enabled": true,
+          "HttpVersion": "http2",
+          "IPV6Enabled": true,
+          "Origins": [
+            {
+              "DomainName": {
+                "Fn::GetAtt": [
+                  "WebBucket12880F5B",
+                  "RegionalDomainName",
+                ],
+              },
+              "Id": "GoldFinchWebtestWebDistributionOrigin15B0FC6F7",
+              "OriginAccessControlId": {
+                "Fn::GetAtt": [
+                  "WebDistributionOrigin1S3OriginAccessControl83AD2F73",
+                  "Id",
+                ],
+              },
+              "S3OriginConfig": {
+                "OriginAccessIdentity": "",
+              },
+            },
+          ],
+          "PriceClass": "PriceClass_100",
+        },
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "web",
+          },
+        ],
+      },
+      "Type": "AWS::CloudFront::Distribution",
+    },
+    "WebDistributionOrigin1S3OriginAccessControl83AD2F73": {
+      "Properties": {
+        "OriginAccessControlConfig": {
+          "Name": "GoldFinchWebtestWebDistributOrigin1S3OriginAccessControlF76B8254",
+          "OriginAccessControlOriginType": "s3",
+          "SigningBehavior": "always",
+          "SigningProtocol": "sigv4",
+        },
+      },
+      "Type": "AWS::CloudFront::OriginAccessControl",
+    },
+    "WebSecurityHeaders14D3AC48": {
+      "Properties": {
+        "ResponseHeadersPolicyConfig": {
+          "Comment": "Security headers (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, CSP report-only) for the GoldFinch SPA",
+          "CustomHeadersConfig": {
+            "Items": [
+              {
+                "Header": "Content-Security-Policy-Report-Only",
+                "Override": true,
+                "Value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://rya92vtrt3.execute-api.us-east-1.amazonaws.com https://goldfinch-login.auth.us-east-1.amazoncognito.com; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'",
+              },
+            ],
+          },
+          "Name": "goldfinch-web-security-prod",
+          "SecurityHeadersConfig": {
+            "ContentTypeOptions": {
+              "Override": true,
+            },
+            "FrameOptions": {
+              "FrameOption": "DENY",
+              "Override": true,
+            },
+            "ReferrerPolicy": {
+              "Override": true,
+              "ReferrerPolicy": "strict-origin-when-cross-origin",
+            },
+            "StrictTransportSecurity": {
+              "AccessControlMaxAgeSec": 31536000,
+              "IncludeSubdomains": true,
+              "Override": true,
+            },
+          },
+        },
+      },
+      "Type": "AWS::CloudFront::ResponseHeadersPolicy",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;

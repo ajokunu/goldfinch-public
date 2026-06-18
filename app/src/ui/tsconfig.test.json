@@ -1,0 +1,32 @@
+{
+  "// why this file": [
+    "Compiles ONLY the pure modules (theme resolution, color mixing + shell",
+    "nav/profile logic) + their node:test suites (no react-native / expo imports anywhere",
+    "in that graph), mirroring the features/goals and src/ui/charts",
+    "harnesses: NodeNext + CommonJS detection (app/package.json has no",
+    "type:module), so the extensionless relative imports stay valid for both",
+    "Metro and the compiled node run. Invoked by the @goldfinch/app",
+    "`npm test` script."
+  ],
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist-test",
+    "types": ["node"],
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": [
+    "themeResolve.ts",
+    "mixColor.ts",
+    "shell/navActive.ts",
+    "shell/profileClaims.ts",
+    "motion/tokens.ts",
+    "motion/motionMath.ts",
+    "motion/countUpMath.ts",
+    "motion/delightMath.ts",
+    "motion/goldfinchMark.ts",
+    "motion/themeCrossfadeMath.ts",
+    "test/**/*"
+  ]
+}

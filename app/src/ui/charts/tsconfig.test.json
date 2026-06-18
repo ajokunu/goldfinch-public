@@ -1,0 +1,17 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist-test",
+    "types": ["node"],
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": [
+    "chartMath.ts",
+    "chartTheme.ts",
+    "categoryColor.ts",
+    "seriesColors.ts",
+    "test/**/*"
+  ]
+}

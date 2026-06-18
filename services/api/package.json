@@ -1,0 +1,32 @@
+{
+  "name": "@goldfinch/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GoldFinch app API Lambda: read/write endpoints behind the API Gateway HTTP API JWT authorizer.",
+  "type": "module",
+  "main": "./dist/handler.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.600.0",
+    "@aws-sdk/client-lambda": "^3.600.0",
+    "@aws-sdk/credential-provider-node": "^3.600.0",
+    "@aws-sdk/lib-dynamodb": "^3.600.0",
+    "@goldfinch/shared": "*",
+    "@smithy/signature-v4": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.140",
+    "@types/node": "^20.14.0",
+    "aws-sdk-client-mock": "^4.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

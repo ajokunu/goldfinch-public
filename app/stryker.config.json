@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-js/master/packages/api/schema/stryker-core.json",
+  "scope_comment": [
+    "App-level mutation testing for the design integration's new pure logic",
+    "(DESIGN-INTEGRATION-DECISIONS item 6, >= 80): theme resolution",
+    "(src/ui/themeResolve.ts), color mixing (src/ui/mixColor.ts), pure shell",
+    "logic (src/ui/shell/navActive.ts, profileClaims.ts), the new pure",
+    "feature formatting/grouping libs (transactions sections/display, goals",
+    "totals, budget amounts incl. the spec-named preset computation,",
+    "dashboard heroMath/labels, reports labels), and the Phase 9 motion math",
+    "(src/ui/motion/motionMath.ts kill-switch/duration rules + countUpMath.ts",
+    "digit-roll slicing; motion/tokens.ts is pure data, covered by typecheck).",
+    "",
+    "NOT mutated here, with reasons:",
+    " - src/ui/charts/* and src/i18n/*: covered by their own stryker configs",
+    "   (run by the same `npm run test:mutation`).",
+    " - React/RN bindings (*.tsx, hooks like useDueLabel/useChartEntrance,",
+    "   useT, systemLocale): render/IO code, covered by typecheck plus the",
+    "   integration/e2e layers of the test plan.",
+    " - features/budget/lib/colors.ts: 12-line delegation to the chart kit's",
+    "   categoryColor (mutation-tested in the charts config); importing the",
+    "   charts index would drag RN components into the node harness.",
+    " - pre-redesign pure modules unchanged by the integration (src/lib/dates,",
+    "   transactions dateRanges, goals inputs/projection, budget grouping,",
+    "   recurring upcoming, reports series): outside the decision-6 'new pure",
+    "   logic' scope; goals inputs/projection still compile into the sandbox",
+    "   because the goals harness emits them alongside totals."
+  ],
+  "mutate": [
+    "src/ui/themeResolve.ts",
+    "src/ui/mixColor.ts",
+    "src/ui/shell/navActive.ts",
+    "src/ui/shell/profileClaims.ts",
+    "src/ui/motion/motionMath.ts",
+    "src/ui/motion/countUpMath.ts",
+    "features/transactions/lib/sections.ts",
+    "features/transactions/lib/display.ts",
+    "features/goals/lib/totals.ts",
+    "features/budget/lib/amounts.ts",
+    "features/dashboard/lib/heroMath.ts",
+    "features/dashboard/lib/labels.ts",
+    "features/reports/lib/labels.ts"
+  ],
+  "runner_comment": [
+    "Same harness pattern as packages/shared and the charts/i18n configs:",
+    "tests are node:test files, so the tap runner executes each compiled test",
+    "file with `node` and parses the TAP stream. buildCommand compiles every",
+    "per-package instrumented harness once in the sandbox (mutant switching",
+    "does the rest); each tsconfig.stryker.json is self-contained because the",
+    "sandbox copy of app/ breaks the ../tsconfig.base.json extends chain."
+  ],
+  "testRunner": "tap",
+  "tap": {
+    "testFiles": [
+      "src/ui/dist-test/test/*.test.js",
+      "features/transactions/dist-test/test/*.test.js",
+      "features/goals/dist-test/test/*.test.js",
+      "features/budget/dist-test/test/*.test.js",
+      "features/dashboard/dist-test/features/dashboard/test/*.test.js",
+      "features/reports/dist-test/features/reports/test/*.test.js"
+    ],
+    "nodeArgs": ["--test-reporter", "tap"],
+    "forceBail": false
+  },
+  "buildCommand": "node scripts/stryker-build.mjs",
+  "coverageAnalysis": "perTest",
+  "incremental": true,
+  "incrementalFile": "reports/stryker-incremental.json",
+  "thresholds_comment": [
+    "break 75 / target >= 80 per the integration quality bar; the score is",
+    "driven to >= 80 by strengthening tests, never by lowering thresholds."
+  ],
+  "thresholds": {
+    "high": 90,
+    "low": 80,
+    "break": 75
+  },
+  "reporters": ["clear-text", "progress", "html", "json"],
+  "htmlReporter": {
+    "fileName": "reports/mutation/mutation.html"
+  },
+  "jsonReporter": {
+    "fileName": "reports/mutation/mutation.json"
+  },
+  "sandbox_comment": [
+    "Every tsconfig except the self-contained *.stryker.json builds is",
+    "excluded from the sandbox: they extend ../tsconfig.base.json (outside",
+    "the sandbox), and their presence triggers Stryker's tsconfig",
+    "preprocessor, which dynamically imports 'typescript' from the npx",
+    "install tree where it is not present. dist/ (expo export), dist-test/",
+    "(stale local builds), reports and assets are dead weight per sandbox."
+  ],
+  "ignorePatterns": [
+    "/dist",
+    "/assets",
+    "/.expo",
+    "/reports",
+    "**/dist-test",
+    "**/.stryker-tmp",
+    "*.tsbuildinfo",
+    "**/*.tsbuildinfo",
+    "**/tsconfig.json",
+    "**/tsconfig.test.json",
+    "/src/ui/charts/reports",
+    "/src/i18n/reports"
+  ],
+  "tempDirName": ".stryker-tmp",
+  "cleanTempDir": true
+}

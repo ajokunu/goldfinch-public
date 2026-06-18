@@ -1,0 +1,63 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-js/master/packages/api/schema/stryker-core.json",
+  "scope_comment": [
+    "Mutation testing for the chart kit's pure logic (charts.md section 12 /",
+    "DESIGN-INTEGRATION-DECISIONS item 6, threshold >= 80): geometry",
+    "(chartMath), token resolution (chartTheme), deterministic category",
+    "coloring (categoryColor), and the income/spend series rule",
+    "(seriesColors). The React/SVG primitives (*.tsx) and the Animated",
+    "entrance hook are deliberately NOT mutated: they are RN render code,",
+    "covered by typecheck plus the integration/e2e layers of the test plan."
+  ],
+  "mutate": [
+    "chartMath.ts",
+    "chartTheme.ts",
+    "categoryColor.ts",
+    "seriesColors.ts"
+  ],
+  "runner_comment": [
+    "This harness tests with node:test (npm test = tsc + node --test), so we",
+    "use the tap runner exactly like packages/shared: it executes each",
+    "compiled test file with `node` and parses the TAP stream node:test",
+    "emits. buildCommand compiles the instrumented sandbox once (mutant",
+    "switching does the rest); see tsconfig.stryker.json for why that build",
+    "skips type checking."
+  ],
+  "testRunner": "tap",
+  "tap": {
+    "testFiles": ["dist-test/test/*.test.js"],
+    "nodeArgs": ["--test-reporter", "tap"],
+    "forceBail": false
+  },
+  "buildCommand": "tsc -p tsconfig.stryker.json",
+  "coverageAnalysis": "perTest",
+  "incremental": true,
+  "incrementalFile": "reports/stryker-incremental.json",
+  "thresholds": {
+    "high": 90,
+    "low": 80,
+    "break": 75
+  },
+  "reporters": ["clear-text", "progress", "html", "json"],
+  "htmlReporter": {
+    "fileName": "reports/mutation/mutation.html"
+  },
+  "jsonReporter": {
+    "fileName": "reports/mutation/mutation.json"
+  },
+  "sandbox_comment": [
+    "tsconfig.test.json is excluded from the sandbox on purpose: it extends",
+    "../../../../tsconfig.base.json (outside the sandbox), and its presence",
+    "triggers Stryker's tsconfig preprocessor, which dynamically imports",
+    "'typescript' from the npx install tree where it is not present. The",
+    "sandbox build only ever uses the self-contained tsconfig.stryker.json."
+  ],
+  "ignorePatterns": [
+    "dist-test",
+    "reports",
+    "*.tsbuildinfo",
+    "tsconfig.test.json"
+  ],
+  "tempDirName": ".stryker-tmp",
+  "cleanTempDir": true
+}

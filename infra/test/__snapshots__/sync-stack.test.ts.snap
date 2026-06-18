@@ -1,0 +1,663 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`SyncStack snapshot 1`] = `
+{
+  "Metadata": {
+    "cdk_nag": {
+      "rules_to_suppress": [
+        {
+          "id": "AwsSolutions-SQS3",
+          "reason": "This queue IS the dead-letter queue for the sync pipeline; a DLQ for the DLQ adds nothing.",
+        },
+        {
+          "id": "AwsSolutions-SNS2",
+          "reason": "CloudWatch alarms cannot publish to SNS topics encrypted with the AWS-managed key, and a dedicated CMK costs $1/mo for alert text that contains no financial data. Transport is TLS-enforced.",
+        },
+        {
+          "id": "AwsSolutions-IAM4",
+          "reason": "Lambdas use the AWS-managed AWSLambdaBasicExecutionRole policy for CloudWatch Logs only.",
+        },
+        {
+          "id": "AwsSolutions-IAM5",
+          "reason": "Wildcards are confined to the GoldFinch table index ARN form table/index/* (index access requires it).",
+        },
+        {
+          "id": "AwsSolutions-L1",
+          "reason": "Runtime is pinned to the Node LTS that the esbuild bundling target (node22) matches; upgrades happen deliberately in lockstep.",
+        },
+      ],
+    },
+  },
+  "Outputs": {
+    "AlertsTopicArn": {
+      "Value": {
+        "Ref": "AlertsTopic3414BE91",
+      },
+    },
+    "SimplefinKeyArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "SimplefinKey8E36C9AD",
+          "Arn",
+        ],
+      },
+    },
+    "SyncDlqUrl": {
+      "Value": {
+        "Ref": "SyncDlq729C78DB",
+      },
+    },
+    "SyncFnArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "SyncFn22B512F6",
+          "Arn",
+        ],
+      },
+    },
+  },
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "AlertsTopic3414BE91": {
+      "Properties": {
+        "DisplayName": "GoldFinch operational alerts",
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "sync",
+          },
+        ],
+        "TopicName": "goldfinch-alerts",
+      },
+      "Type": "AWS::SNS::Topic",
+    },
+    "AlertsTopicPolicyA6E49DF4": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sns:Publish",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": "*",
+              "Resource": {
+                "Ref": "AlertsTopic3414BE91",
+              },
+              "Sid": "AllowPublishThroughSSLOnly",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Topics": [
+          {
+            "Ref": "AlertsTopic3414BE91",
+          },
+        ],
+      },
+      "Type": "AWS::SNS::TopicPolicy",
+    },
+    "DailySyncSchedule": {
+      "Properties": {
+        "Description": "Daily SimpleFIN sync trigger",
+        "FlexibleTimeWindow": {
+          "Mode": "OFF",
+        },
+        "Name": "goldfinch-daily-sync-prod",
+        "ScheduleExpression": "cron(0 9 * * ? *)",
+        "ScheduleExpressionTimezone": "America/New_York",
+        "State": "ENABLED",
+        "Target": {
+          "Arn": {
+            "Fn::GetAtt": [
+              "SyncFn22B512F6",
+              "Arn",
+            ],
+          },
+          "DeadLetterConfig": {
+            "Arn": {
+              "Fn::GetAtt": [
+                "SyncDlq729C78DB",
+                "Arn",
+              ],
+            },
+          },
+          "RetryPolicy": {
+            "MaximumEventAgeInSeconds": 3600,
+            "MaximumRetryAttempts": 3,
+          },
+          "RoleArn": {
+            "Fn::GetAtt": [
+              "SchedulerRole59E73443",
+              "Arn",
+            ],
+          },
+        },
+      },
+      "Type": "AWS::Scheduler::Schedule",
+    },
+    "SchedulerRole59E73443": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": "111111111111",
+                },
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "scheduler.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Description": "Lets EventBridge Scheduler invoke the GoldFinch scheduled Lambdas and dead-letter to SQS",
+        "RoleName": "GoldFinch-SyncScheduler-prod",
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "sync",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "SchedulerRoleDefaultPolicy66F774B8": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "SyncFn22B512F6",
+                  "Arn",
+                ],
+              },
+              "Sid": "InvokeSyncFn",
+            },
+            {
+              "Action": [
+                "sqs:SendMessage",
+                "sqs:GetQueueAttributes",
+                "sqs:GetQueueUrl",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "SyncDlq729C78DB",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "SchedulerRoleDefaultPolicy66F774B8",
+        "Roles": [
+          {
+            "Ref": "SchedulerRole59E73443",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "SimplefinKey8E36C9AD": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "Description": "CMK encrypting the SimpleFIN access-url SSM SecureString (decrypt: sync role only)",
+        "EnableKeyRotation": true,
+        "KeyPolicy": {
+          "Statement": [
+            {
+              "Action": "kms:*",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":iam::111111111111:root",
+                    ],
+                  ],
+                },
+              },
+              "Resource": "*",
+            },
+            {
+              "Action": "kms:Decrypt",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::GetAtt": [
+                    "SyncFnServiceRoleE6C2992D",
+                    "Arn",
+                  ],
+                },
+              },
+              "Resource": "*",
+              "Sid": "AllowSyncRoleDecryptOnly",
+            },
+            {
+              "Action": "kms:Decrypt",
+              "Condition": {
+                "StringNotEquals": {
+                  "aws:PrincipalArn": {
+                    "Fn::GetAtt": [
+                      "SyncFnServiceRoleE6C2992D",
+                      "Arn",
+                    ],
+                  },
+                },
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*",
+              },
+              "Resource": "*",
+              "Sid": "DenyDecryptExceptSyncRole",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "sync",
+          },
+        ],
+      },
+      "Type": "AWS::KMS::Key",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "SimplefinKeyAlias4B424F9F": {
+      "Properties": {
+        "AliasName": "alias/goldfinch/simplefin",
+        "TargetKeyId": {
+          "Fn::GetAtt": [
+            "SimplefinKey8E36C9AD",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::KMS::Alias",
+    },
+    "SyncDlq729C78DB": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "MessageRetentionPeriod": 1209600,
+        "QueueName": "goldfinch-sync-dlq-prod",
+        "SqsManagedSseEnabled": true,
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "sync",
+          },
+        ],
+      },
+      "Type": "AWS::SQS::Queue",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "SyncDlqAlarmED9E9B45": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlertsTopic3414BE91",
+          },
+        ],
+        "AlarmDescription": "A sync invocation failed terminally and landed in the DLQ",
+        "AlarmName": "goldfinch-sync-dlq-prod",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "Dimensions": [
+          {
+            "Name": "QueueName",
+            "Value": {
+              "Fn::GetAtt": [
+                "SyncDlq729C78DB",
+                "QueueName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "ApproximateNumberOfMessagesVisible",
+        "Namespace": "AWS/SQS",
+        "Period": 300,
+        "Statistic": "Maximum",
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "sync",
+          },
+        ],
+        "Threshold": 1,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "SyncDlqPolicyD54B6507": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sqs:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*",
+              },
+              "Resource": {
+                "Fn::GetAtt": [
+                  "SyncDlq729C78DB",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Queues": [
+          {
+            "Ref": "SyncDlq729C78DB",
+          },
+        ],
+      },
+      "Type": "AWS::SQS::QueuePolicy",
+    },
+    "SyncErrorsAlarm3839A37B": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlertsTopic3414BE91",
+          },
+        ],
+        "AlarmDescription": "The sync Lambda reported one or more errors in the last six hours",
+        "AlarmName": "goldfinch-sync-errors-prod",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "SyncFn22B512F6",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "Errors",
+        "Namespace": "AWS/Lambda",
+        "Period": 21600,
+        "Statistic": "Sum",
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "sync",
+          },
+        ],
+        "Threshold": 1,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "SyncFn22B512F6": {
+      "DependsOn": [
+        "SyncFnServiceRoleDefaultPolicy3A573F00",
+        "SyncFnServiceRoleE6C2992D",
+      ],
+      "Properties": {
+        "Architectures": [
+          "arm64",
+        ],
+        "Code": {
+          "S3Bucket": "cdk-hnb659fds-assets-111111111111-us-east-1",
+          "S3Key": "817c2f91e2ad1295e45b81aa12e740bfd4eef7caf49ffb461805f40e0e132aa8.zip",
+        },
+        "Description": "Daily SimpleFIN sync: pulls accounts/transactions and upserts into the GoldFinch table",
+        "Environment": {
+          "Variables": {
+            "BASE_CURRENCY": "USD",
+            "EVENT_BUS_NAME": "default",
+            "EVENT_SOURCE": "goldfinch.sync",
+            "GSI1_NAME": "GSI1",
+            "GSI2_NAME": "GSI2",
+            "HOUSEHOLD_ID": "goldfinch-home",
+            "MAX_HISTORY_DAYS": "90",
+            "METRICS_NAMESPACE": "GoldFinch/Sync",
+            "OVERLAP_BUFFER_DAYS": "7",
+            "SIMPLEFIN_PARAM_NAME": "/goldfinch/prod/simplefin/access-url",
+            "TABLE_NAME": {
+              "Fn::ImportValue": "GoldFinch-Data-test:ExportsOutputRefGoldFinchTable13747E22DF051311",
+            },
+          },
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogGroup": {
+            "Ref": "SyncFnLogsBC8C9FCF",
+          },
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "SyncFnServiceRoleE6C2992D",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs22.x",
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "sync",
+          },
+        ],
+        "Timeout": 120,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "SyncFnEventInvokeConfig159374D0": {
+      "Properties": {
+        "DestinationConfig": {
+          "OnFailure": {
+            "Destination": {
+              "Fn::GetAtt": [
+                "SyncDlq729C78DB",
+                "Arn",
+              ],
+            },
+          },
+        },
+        "FunctionName": {
+          "Ref": "SyncFn22B512F6",
+        },
+        "MaximumRetryAttempts": 0,
+        "Qualifier": "$LATEST",
+      },
+      "Type": "AWS::Lambda::EventInvokeConfig",
+    },
+    "SyncFnLogsBC8C9FCF": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "RetentionInDays": 30,
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "sync",
+          },
+        ],
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "SyncFnServiceRoleDefaultPolicy3A573F00": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "sqs:SendMessage",
+                "sqs:GetQueueAttributes",
+                "sqs:GetQueueUrl",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "SyncDlq729C78DB",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": "ssm:GetParameter",
+              "Effect": "Allow",
+              "Resource": "arn:aws:ssm:us-east-1:111111111111:parameter/goldfinch/prod/simplefin/access-url",
+              "Sid": "ReadSimplefinParam",
+            },
+            {
+              "Action": "kms:Decrypt",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "SimplefinKey8E36C9AD",
+                  "Arn",
+                ],
+              },
+              "Sid": "DecryptSimplefinParam",
+            },
+            {
+              "Action": [
+                "dynamodb:BatchWriteItem",
+                "dynamodb:DeleteItem",
+                "dynamodb:PutItem",
+                "dynamodb:Query",
+                "dynamodb:UpdateItem",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::ImportValue": "GoldFinch-Data-test:ExportsOutputFnGetAttGoldFinchTable13747E22Arn5BDEB372",
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::ImportValue": "GoldFinch-Data-test:ExportsOutputFnGetAttGoldFinchTable13747E22Arn5BDEB372",
+                      },
+                      "/index/*",
+                    ],
+                  ],
+                },
+              ],
+              "Sid": "GoldFinchTableSyncAccess",
+            },
+            {
+              "Action": "events:PutEvents",
+              "Condition": {
+                "StringEquals": {
+                  "events:source": "goldfinch.sync",
+                },
+              },
+              "Effect": "Allow",
+              "Resource": "arn:aws:events:us-east-1:111111111111:event-bus/default",
+              "Sid": "PutSyncCompletedEvents",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "SyncFnServiceRoleDefaultPolicy3A573F00",
+        "Roles": [
+          {
+            "Ref": "SyncFnServiceRoleE6C2992D",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "SyncFnServiceRoleE6C2992D": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "sync",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;

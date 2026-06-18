@@ -1,0 +1,5 @@
+dist/
+node_modules/
+# One-shot claim sentinel (scripts/claim-simplefin-token.ts). Contains only a
+# timestamp + host, never the access URL, but it is machine-local state.
+.claimed

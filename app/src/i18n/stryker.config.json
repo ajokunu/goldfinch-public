@@ -1,0 +1,62 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-js/master/packages/api/schema/stryker-core.json",
+  "scope_comment": [
+    "Mutation testing for the pure i18n logic named by",
+    "ops/DESIGN-INTEGRATION-DECISIONS.md decision 6 ('i18n lookup' at >= 80):",
+    "translate.ts, resolve.ts (resolveLang + localeTag), messages.ts.",
+    "Deliberately NOT mutated: strings.ts (a data table; mutating string",
+    "literals only proves strings change -- the table is locked by the",
+    "exhaustive en/ko assertions in test/translate.test.ts), useT.ts and",
+    "systemLocale.ts (React/IO bindings, covered by the app integration",
+    "layer), index.ts (re-exports only)."
+  ],
+  "mutate": ["translate.ts", "resolve.ts", "messages.ts"],
+  "runner_comment": [
+    "Mirrors packages/shared: tests are node:test files, so the tap runner",
+    "executes each compiled test file with `node` and parses the TAP stream.",
+    "buildCommand compiles the instrumented sandbox once (mutant switching",
+    "does the rest); see tsconfig.stryker.json for why that build is",
+    "self-contained and skips type checking."
+  ],
+  "testRunner": "tap",
+  "tap": {
+    "testFiles": ["dist-test/test/*.test.js"],
+    "nodeArgs": ["--test-reporter", "tap"],
+    "forceBail": false
+  },
+  "buildCommand": "tsc -p tsconfig.stryker.json",
+  "coverageAnalysis": "perTest",
+  "incremental": true,
+  "incrementalFile": "reports/stryker-incremental.json",
+  "thresholds_comment": [
+    "break is 80 (not packages/shared's 75) because decision 6 sets >= 80 as",
+    "the floor for the i18n lookup modules."
+  ],
+  "thresholds": {
+    "high": 90,
+    "low": 80,
+    "break": 80
+  },
+  "reporters": ["clear-text", "progress", "html", "json"],
+  "htmlReporter": {
+    "fileName": "reports/mutation/mutation.html"
+  },
+  "jsonReporter": {
+    "fileName": "reports/mutation/mutation.json"
+  },
+  "sandbox_comment": [
+    "tsconfig.test.json is excluded from the sandbox on purpose: it extends",
+    "../../../tsconfig.base.json (outside the sandbox), and its presence",
+    "triggers Stryker's tsconfig preprocessor, which dynamically imports",
+    "'typescript' from the npx install tree where it is not present. The",
+    "sandbox build only ever uses the self-contained tsconfig.stryker.json."
+  ],
+  "ignorePatterns": [
+    "dist-test",
+    "reports",
+    "*.tsbuildinfo",
+    "tsconfig.test.json"
+  ],
+  "tempDirName": ".stryker-tmp",
+  "cleanTempDir": true
+}

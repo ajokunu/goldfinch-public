@@ -1,0 +1,20 @@
+{
+  "name": "@goldfinch/feature-attachments",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GoldFinch attachments feature (P7-9): transaction-detail attachments section (capture/pick, presigned upload with progress, thumbnail grid, delete) and the full-screen attachment viewer. Lives inside the @goldfinch/app Expo workspace; not an independent npm workspace.",
+  "main": "./index.tsx",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@goldfinch/shared": "*",
+    "@tanstack/react-query": "^5.59.16",
+    "expo-router": "~6.0.0",
+    "expo-web-browser": "~15.0.0",
+    "lucide-react-native": "^0.511.0",
+    "react": "19.1.0",
+    "react-native": "0.81.4"
+  }
+}

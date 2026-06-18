@@ -1,0 +1,3064 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ApiStack snapshot 1`] = `
+{
+  "Metadata": {
+    "cdk_nag": {
+      "rules_to_suppress": [
+        {
+          "id": "AwsSolutions-S1",
+          "reason": "Server access logging for a two-user private attachments bucket adds cost with no review value; all access is presigned by the API Lambda, whose logs retain request ids.",
+        },
+        {
+          "id": "AwsSolutions-APIG1",
+          "reason": "HTTP API access logging is disabled deliberately: two known users, JWT-gated routes, and CloudWatch Logs cost discipline. Lambda logs retain request ids for tracing.",
+        },
+        {
+          "id": "AwsSolutions-APIG4",
+          "reason": "Every route is protected by the JWT authorizer with the goldfinch/api scope; only the gateway-managed CORS preflight is unauthenticated.",
+        },
+        {
+          "id": "AwsSolutions-IAM4",
+          "reason": "The API Lambda uses the AWS-managed AWSLambdaBasicExecutionRole policy for CloudWatch Logs only.",
+        },
+        {
+          "id": "AwsSolutions-IAM5",
+          "reason": "Wildcards are confined to (a) the GoldFinch table index ARN form table/index/* (index access requires it), and (b) the attachments object grant, which is prefix-scoped to the household (<bucket>/<householdId>/*) -- the narrowest expressible object grant for presigned access.",
+        },
+        {
+          "id": "AwsSolutions-L1",
+          "reason": "Runtime is pinned to the Node LTS that the esbuild bundling target (node22) matches; upgrades happen deliberately in lockstep.",
+        },
+      ],
+    },
+  },
+  "Outputs": {
+    "ApiUrl": {
+      "Value": {
+        "Fn::GetAtt": [
+          "HttpApiF5A9A8A7",
+          "ApiEndpoint",
+        ],
+      },
+    },
+    "AttachmentsBucketName": {
+      "Value": {
+        "Ref": "AttachmentsBucket8E14A36F",
+      },
+    },
+  },
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "ApiFnE0725F78": {
+      "DependsOn": [
+        "ApiFnServiceRoleDefaultPolicy56A1E6E5",
+        "ApiFnServiceRoleD18AAE0E",
+      ],
+      "Properties": {
+        "Architectures": [
+          "arm64",
+        ],
+        "Code": {
+          "S3Bucket": "cdk-hnb659fds-assets-111111111111-us-east-1",
+          "S3Key": "25ffd4454c9322e8c4d7487b3eb8075e15023084e5ba24efa2ab9ac36bd469c0.zip",
+        },
+        "Description": "GoldFinch app API handler (single function, internal routing by routeKey)",
+        "Environment": {
+          "Variables": {
+            "ATTACHMENTS_BUCKET": {
+              "Ref": "AttachmentsBucket8E14A36F",
+            },
+            "BASE_CURRENCY": "USD",
+            "DEFAULT_TZ": "America/New_York",
+            "GSI1_NAME": "GSI1",
+            "GSI2_NAME": "GSI2",
+            "SYNC_FN_NAME": {
+              "Fn::ImportValue": "GoldFinch-Sync-test:ExportsOutputRefSyncFn22B512F655A6A08C",
+            },
+            "TABLE_NAME": {
+              "Fn::ImportValue": "GoldFinch-Data-test:ExportsOutputRefGoldFinchTable13747E22DF051311",
+            },
+          },
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogGroup": {
+            "Ref": "ApiFnLogsADB874AE",
+          },
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "ApiFnServiceRoleD18AAE0E",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs22.x",
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "api",
+          },
+        ],
+        "Timeout": 10,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "ApiFnLogsADB874AE": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "RetentionInDays": 30,
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "api",
+          },
+        ],
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "ApiFnServiceRoleD18AAE0E": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "api",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "ApiFnServiceRoleDefaultPolicy56A1E6E5": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "s3:DeleteObject",
+                "s3:GetObject",
+                "s3:PutObject",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "AttachmentsBucket8E14A36F",
+                        "Arn",
+                      ],
+                    },
+                    "/goldfinch-home/*",
+                  ],
+                ],
+              },
+              "Sid": "GoldFinchAttachmentsObjectAccess",
+            },
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::ImportValue": "GoldFinch-Sync-test:ExportsOutputFnGetAttSyncFn22B512F6ArnF186BC90",
+              },
+              "Sid": "InvokeSyncFunction",
+            },
+            {
+              "Action": [
+                "dynamodb:BatchWriteItem",
+                "dynamodb:DeleteItem",
+                "dynamodb:GetItem",
+                "dynamodb:PutItem",
+                "dynamodb:Query",
+                "dynamodb:UpdateItem",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::ImportValue": "GoldFinch-Data-test:ExportsOutputFnGetAttGoldFinchTable13747E22Arn5BDEB372",
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::ImportValue": "GoldFinch-Data-test:ExportsOutputFnGetAttGoldFinchTable13747E22Arn5BDEB372",
+                      },
+                      "/index/*",
+                    ],
+                  ],
+                },
+              ],
+              "Sid": "GoldFinchTableAccess",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "ApiFnServiceRoleDefaultPolicy56A1E6E5",
+        "Roles": [
+          {
+            "Ref": "ApiFnServiceRoleD18AAE0E",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "AttachmentsBucket8E14A36F": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256",
+              },
+            },
+          ],
+        },
+        "BucketName": "goldfinch-attachments-111111111111-us-east-1",
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "AbortIncompleteMultipartUpload": {
+                "DaysAfterInitiation": 7,
+              },
+              "Id": "abort-incomplete-uploads",
+              "Status": "Enabled",
+            },
+          ],
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true,
+        },
+        "Tags": [
+          {
+            "Key": "Component",
+            "Value": "api",
+          },
+        ],
+      },
+      "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "AttachmentsBucketPolicy66DD7E0A": {
+      "Properties": {
+        "Bucket": {
+          "Ref": "AttachmentsBucket8E14A36F",
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*",
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "AttachmentsBucket8E14A36F",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "AttachmentsBucket8E14A36F",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::S3::BucketPolicy",
+    },
+    "HttpApiDELETEbudgetscategoryId9D32E3AA": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "DELETE /budgets/{categoryId}",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiDELETEbudgetscategoryIdApiIntegrationPermission0CCB24F2": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/budgets/{categoryId}",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiDELETEcategoriescategoryIdA0656420": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "DELETE /categories/{categoryId}",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiDELETEcategoriescategoryIdApiIntegrationPermissionA3E2D74F": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/categories/{categoryId}",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiDELETEdevicespushtokendeviceId81B68B61": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "DELETE /devices/push-token/{deviceId}",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiDELETEdevicespushtokendeviceIdApiIntegrationPermission062FFF68": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/devices/push-token/{deviceId}",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiDELETEgoalsgoalId22CD498C": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "DELETE /goals/{goalId}",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiDELETEgoalsgoalIdApiIntegrationPermissionD0D20CD6": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/goals/{goalId}",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiDELETErulesruleId8326ECAA": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "DELETE /rules/{ruleId}",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiDELETErulesruleIdApiIntegrationPermission6F8D2FAD": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/rules/{ruleId}",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiDELETEtransactionstxnIdattachmentsattachId9137C659": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "DELETE /transactions/{txnId}/attachments/{attachId}",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiDELETEtransactionstxnIdattachmentsattachIdApiIntegrationPermissionD5A1160A": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/transactions/{txnId}/attachments/{attachId}",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiDefaultStage3EEB07D6": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AutoDeploy": true,
+        "StageName": "$default",
+        "Tags": {
+          "Component": "api",
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Stage",
+    },
+    "HttpApiF5A9A8A7": {
+      "Properties": {
+        "CorsConfiguration": {
+          "AllowHeaders": [
+            "authorization",
+            "content-type",
+          ],
+          "AllowMethods": [
+            "GET",
+            "POST",
+            "PATCH",
+            "DELETE",
+            "OPTIONS",
+          ],
+          "AllowOrigins": [
+            "http://localhost:8081",
+            "http://localhost:19006",
+          ],
+          "MaxAge": 86400,
+        },
+        "Description": "GoldFinch read/write API (JWT-gated, access tokens only)",
+        "Name": "goldfinch-api-prod",
+        "ProtocolType": "HTTP",
+        "Tags": {
+          "Component": "api",
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Api",
+    },
+    "HttpApiGETaccountsApiIntegrationPermission1D5316CF": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/accounts",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiGETaccountsB574A3A0": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "GET /accounts",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiGETaccountsaccountId6ED080E6": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "GET /accounts/{accountId}",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiGETaccountsaccountIdApiIntegrationPermission69AD478C": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/accounts/{accountId}",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiGETaccountsaccountIdholdings7345464D": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "GET /accounts/{accountId}/holdings",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiGETaccountsaccountIdholdingsApiIntegrationPermissionFFBC2110": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/accounts/{accountId}/holdings",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiGETaccountsaccountIdholdingssymbolpricehistory8AD8CE9E": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "GET /accounts/{accountId}/holdings/{symbol}/price-history",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiGETaccountsaccountIdholdingssymbolpricehistoryApiIntegrationPermissionDA09D0B0": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/accounts/{accountId}/holdings/{symbol}/price-history",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiGETaccountsaccountIdtransactions708C6AF0": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "GET /accounts/{accountId}/transactions",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiGETaccountsaccountIdtransactionsApiIntegrationPermissionADC97492": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/accounts/{accountId}/transactions",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiGETbudgets39B4D250": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "GET /budgets",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiGETbudgetsApiIntegrationPermissionCB9C2064": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/budgets",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiGETcashflow54DDFA97": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "GET /cashflow",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiGETcashflowApiIntegrationPermission99C9AF96": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/cashflow",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiGETcategories15ED361E": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "GET /categories",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiGETcategoriesApiIntegrationPermission9594D9BF": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/categories",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiGETgoals200EB13D": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "GET /goals",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiGETgoalsApiIntegrationPermission14917B89": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/goals",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiGEThealthAB1F4856": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "GET /health",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiGEThealthApiIntegration8B197B8C": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "PayloadFormatVersion": "2.0",
+      },
+      "Type": "AWS::ApiGatewayV2::Integration",
+    },
+    "HttpApiGEThealthApiIntegrationPermissionBE15BCAA": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/health",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiGETnetworthhistory1D3E9DB1": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "GET /networth/history",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiGETnetworthhistoryApiIntegrationPermissionD3DEBAF5": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/networth/history",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiGETprofileApiIntegrationPermission7D556A2D": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/profile",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiGETprofileEFE5CE8B": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "GET /profile",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiGETrecurring223021FD": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "GET /recurring",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiGETrecurringApiIntegrationPermission11180B56": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/recurring",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiGETreportsflow0F432493": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "GET /reports/flow",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiGETreportsflowApiIntegrationPermissionB3C27CB6": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/reports/flow",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiGETreportstrendsApiIntegrationPermission674E0A67": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/reports/trends",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiGETreportstrendsDA3E8955": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "GET /reports/trends",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiGETrules0E12D384": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "GET /rules",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiGETrulesApiIntegrationPermission59BEE977": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/rules",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiGETsummary277FDAE4": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "GET /summary",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiGETsummaryApiIntegrationPermissionBCF0062B": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/summary",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiGETsyncstatusApiIntegrationPermission70B9DA29": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/sync/status",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiGETsyncstatusBBDE9FC7": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "GET /sync/status",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiGETtransactions22494F37": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "GET /transactions",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiGETtransactionsApiIntegrationPermission6388FB87": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/transactions",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiGETtransactionstxnIdattachments5FD8C940": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "GET /transactions/{txnId}/attachments",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiGETtransactionstxnIdattachmentsApiIntegrationPermissionEA837A5B": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/transactions/{txnId}/attachments",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiGETtransactionstxnIdattachmentsattachId5216A9F3": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "GET /transactions/{txnId}/attachments/{attachId}",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiGETtransactionstxnIdattachmentsattachIdApiIntegrationPermission3DC6545D": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/transactions/{txnId}/attachments/{attachId}",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiJwtAuthorizer14F16BDB": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizerType": "JWT",
+        "IdentitySource": [
+          "$request.header.Authorization",
+        ],
+        "JwtConfiguration": {
+          "Audience": [
+            "test-client-id",
+          ],
+          "Issuer": "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_TESTPOOL",
+        },
+        "Name": "JwtAuthorizer",
+      },
+      "Type": "AWS::ApiGatewayV2::Authorizer",
+    },
+    "HttpApiPATCHaccountsaccountId97E6871A": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "PATCH /accounts/{accountId}",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiPATCHaccountsaccountIdApiIntegrationPermissionB1D55FAF": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/accounts/{accountId}",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiPATCHbudgetscategoryIdApiIntegrationPermission0E81B53E": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/budgets/{categoryId}",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiPATCHbudgetscategoryIdB94BC1B8": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "PATCH /budgets/{categoryId}",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiPATCHcategoriescategoryId4B011D95": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "PATCH /categories/{categoryId}",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiPATCHcategoriescategoryIdApiIntegrationPermission8DB92A9C": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/categories/{categoryId}",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiPATCHgoalsgoalId1E789645": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "PATCH /goals/{goalId}",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiPATCHgoalsgoalIdApiIntegrationPermissionD87E1912": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/goals/{goalId}",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiPATCHprofileApiIntegrationPermission96BA340C": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/profile",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiPATCHprofileBCA5CFCC": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "PATCH /profile",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiPATCHrecurringseriesIdADB21E85": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "PATCH /recurring/{seriesId}",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiPATCHrecurringseriesIdApiIntegrationPermissionE81BA069": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/recurring/{seriesId}",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiPATCHrulesruleId67B2E04B": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "PATCH /rules/{ruleId}",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiPATCHrulesruleIdApiIntegrationPermissionD34516D7": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/rules/{ruleId}",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiPATCHtransactionstxnId7966CEED": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "PATCH /transactions/{txnId}",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiPATCHtransactionstxnIdApiIntegrationPermission432C1229": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/transactions/{txnId}",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiPOSTaccounts5E58E425": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "POST /accounts",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiPOSTaccountsApiIntegrationPermission1B4D9143": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/accounts",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiPOSTaccountsaccountIdholdingssymbolcostbasisApiIntegrationPermissionF0E6B1C9": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/accounts/{accountId}/holdings/{symbol}/cost-basis",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiPOSTaccountsaccountIdholdingssymbolcostbasisC403598D": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "POST /accounts/{accountId}/holdings/{symbol}/cost-basis",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiPOSTbudgetsApiIntegrationPermission792A41CE": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/budgets",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiPOSTbudgetsE32EF891": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "POST /budgets",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiPOSTcategories5EA30D0C": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "POST /categories",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiPOSTcategoriesApiIntegrationPermission3C294A16": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/categories",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiPOSTdevicespushtoken1F0757CA": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "POST /devices/push-token",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiPOSTdevicespushtokenApiIntegrationPermission272FA4D5": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/devices/push-token",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiPOSTgoals43D530A6": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "POST /goals",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiPOSTgoalsApiIntegrationPermission36E8E457": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/goals",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiPOSTgoalsgoalIdcontributionsApiIntegrationPermission4CC0873C": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/goals/{goalId}/contributions",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiPOSTgoalsgoalIdcontributionsD352EBC7": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "POST /goals/{goalId}/contributions",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiPOSTimporttransactionsApiIntegrationPermissionEEBCE551": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/import/transactions",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiPOSTimporttransactionsCC7600DE": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "POST /import/transactions",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiPOSTrules048375F9": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "POST /rules",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiPOSTrulesApiIntegrationPermission07585524": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/rules",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiPOSTrulesruleIdapply7879745E": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "POST /rules/{ruleId}/apply",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiPOSTrulesruleIdapplyApiIntegrationPermissionF1C68B62": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/rules/{ruleId}/apply",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiPOSTsyncrun18C49276": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "POST /sync/run",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiPOSTsyncrunApiIntegrationPermission4D968B24": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/sync/run",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiPOSTtransactionstxnIdattachments65EA33CD": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "POST /transactions/{txnId}/attachments",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiPOSTtransactionstxnIdattachmentsApiIntegrationPermission9E2C9C1D": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/transactions/{txnId}/attachments",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;

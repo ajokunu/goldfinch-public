@@ -1,0 +1,40 @@
+{
+  "// why this file": [
+    "Build config used ONLY by Stryker's buildCommand (see stryker.config.json).",
+    "It is deliberately self-contained (no `extends`): Stryker copies this",
+    "directory into .stryker-tmp/sandbox-*/, which breaks the",
+    "../../../tsconfig.base.json relative extends chain. Compiler options",
+    "mirror tsconfig.base.json + tsconfig.test.json (CommonJS output so the",
+    "extensionless relative imports resolve under node; see tsconfig.test.json),",
+    "with two mutation-specific differences, same as packages/shared:",
+    " - noCheck: Stryker's mutants are syntactically valid but often",
+    "   type-invalid; we emit without type checking so every mutant actually",
+    "   RUNS and must be killed by a test, not by the compiler.",
+    " - no declarations/sourcemaps: dead weight per sandbox build."
+  ],
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "node10",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "declaration": false,
+    "sourceMap": false,
+    "noCheck": true,
+    "types": ["node"],
+    "rootDir": ".",
+    "outDir": "dist-test"
+  },
+  "include": [
+    "strings.ts",
+    "translate.ts",
+    "resolve.ts",
+    "messages.ts",
+    "test/**/*"
+  ]
+}

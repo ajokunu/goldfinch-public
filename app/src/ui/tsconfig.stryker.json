@@ -1,0 +1,42 @@
+{
+  "// why this file": [
+    "Build config used ONLY by the app-level Stryker run (app/stryker.config.json",
+    "buildCommand). Deliberately self-contained (no `extends`): the sandbox is a",
+    "copy of app/, so the ../../../tsconfig.base.json extends chain would break.",
+    "Compiler options mirror tsconfig.base.json + tsconfig.test.json, with two",
+    "mutation-specific differences:",
+    " - noCheck: Stryker's mutants are syntactically valid but often type-invalid;",
+    "   we emit without type checking so every mutant actually RUNS and must be",
+    "   killed by a test, not by the compiler.",
+    " - no declarations/sourcemaps: dead weight per sandbox build."
+  ],
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "declaration": false,
+    "sourceMap": false,
+    "noCheck": true,
+    "types": ["node"],
+    "rootDir": ".",
+    "outDir": "dist-test"
+  },
+  "include": [
+    "themeResolve.ts",
+    "mixColor.ts",
+    "shell/navActive.ts",
+    "shell/profileClaims.ts",
+    "motion/tokens.ts",
+    "motion/motionMath.ts",
+    "motion/countUpMath.ts",
+    "motion/themeCrossfadeMath.ts",
+    "test/**/*"
+  ]
+}
