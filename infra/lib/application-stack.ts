@@ -39,7 +39,7 @@ export class ApplicationStack extends Stack {
     this.application = new CfnApplication(this, 'GoldFinchApplication', {
       name: 'GoldFinch',
       description:
-        'Private serverless household finance app (Monarch replacement): ' +
+        'Private serverless household finance app: ' +
         'Cognito auth, DynamoDB single table, API Gateway + Lambda, SimpleFIN ' +
         'daily sync, notifications, AI insights, S3/CloudFront web client.',
     });

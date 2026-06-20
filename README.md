@@ -4,10 +4,10 @@
 
 <h1 align="center">GoldFinch</h1>
 
-Private, serverless household finance — a self-built Monarch Money replacement.
-Daily bank sync, budgets, recurring detection, reports, goals, investments, CSV
-import, and AI categorization, with native iOS + Android + web from one Expo
-codebase, running on AWS for about $3-4/month all-in.
+Private, serverless household finance you run on your own AWS account. Daily bank
+sync, budgets, recurring detection, reports, goals, investments, CSV import, and
+AI categorization, with native iOS + Android + web from one Expo codebase,
+running for about $3-4/month all-in.
 
 This is published as an **open reference architecture** — a complete, production-grade
 example of a serverless personal-finance app: DynamoDB single-table design, a
@@ -19,11 +19,18 @@ It is **not** a hosted service and not multi-tenant — see "Single-household by
 
 ## Screenshots
 
-> Drop your own captures into `docs/screenshots/` and they render here.
+> Synthetic demo data (no real finances) — rendered from the app's Playwright
+> walkthrough against a fully mocked API.
 
-| Dashboard | Budgets | Transactions | Investments |
+| Dashboard | Budgets | Transactions | Reports |
 |---|---|---|---|
-| _add `docs/screenshots/dashboard.png`_ | _add `budgets.png`_ | _add `transactions.png`_ | _add `investments.png`_ |
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Budgets](docs/screenshots/budgets.png) | ![Transactions](docs/screenshots/transactions.png) | ![Reports](docs/screenshots/reports.png) |
+
+Goals & projections, plus a built-in multi-theme system:
+
+| Goals | Theming |
+|---|---|
+| ![Goals](docs/screenshots/goals.png) | ![Theming](docs/screenshots/theming.png) |
 
 ## Architecture
 
