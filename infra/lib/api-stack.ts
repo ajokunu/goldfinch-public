@@ -152,15 +152,19 @@ export class ApiStack extends Stack {
       }),
     );
 
-    // Least-privilege table access: exactly BatchWriteItem/Query/GetItem/
-    // PutItem/UpdateItem/DeleteItem on the table and its GSIs. No Scan, no
-    // SSM/KMS/Bedrock. Two write actions are deliberate, reviewed grants:
+    // Least-privilege table access on the table and its GSIs. No Scan, no
+    // SSM/KMS/Bedrock. Three write actions are deliberate, reviewed grants:
     //  - DeleteItem backs DELETE /budgets/{categoryId} (hard DeleteCommand on
     //    the single budget item).
     //  - BatchWriteItem backs DELETE /goals/{goalId}, which removes the goal
     //    AND its contribution rows in one BatchWriteCommand; without it the
     //    delete 500s and the contribution rows are orphaned. The action is
     //    scoped to the table ARN only (BatchWriteItem never targets indexes).
+    //  - TransactWriteItems backs POST /import/transactions, which atomically
+    //    writes the dedupe pointer + the new transaction row in one
+    //    TransactWriteCommand (import.ts); without it CSV import 500s.
+    // Kept in lockstep with the route<->IAM parity test in api-stack.test.ts,
+    // which fails if a route calls a DynamoDB action this grant omits.
     this.apiFn.addToRolePolicy(
       new PolicyStatement({
         sid: 'GoldFinchTableAccess',
@@ -171,6 +175,7 @@ export class ApiStack extends Stack {
           'dynamodb:GetItem',
           'dynamodb:PutItem',
           'dynamodb:Query',
+          'dynamodb:TransactWriteItems',
           'dynamodb:UpdateItem',
         ],
         resources: [table.tableArn, `${table.tableArn}/index/*`],

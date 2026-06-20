@@ -5,7 +5,7 @@
  */
 import { useMemo } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import type { IsoDate, IsoMonth, TransactionDto } from '@goldfinch/shared/types';
+import type { IsoMonth, TransactionDto } from '@goldfinch/shared/types';
 
 import {
   getCashflow,
@@ -26,26 +26,7 @@ export function useCategoriesQuery() {
 export function useBudgetsQuery() {
   return useQuery({
     queryKey: queryKeys.budgets.all(),
-    queryFn: ({ signal }) => listBudgets({}, signal),
-  });
-}
-
-/**
- * Budgets windowed to an arbitrary inclusive [from,to] range (budget-range
- * feature). The server returns range spend + the prorated range target (in
- * `limitMinor`) per budget. `enabled` gates the fetch so the default
- * current-period view never issues a range request. The range key caches each
- * window independently of the default `budgets.all()` query.
- */
-export function useBudgetsRangeQuery(
-  from: IsoDate,
-  to: IsoDate,
-  enabled = true,
-) {
-  return useQuery({
-    queryKey: queryKeys.budgets.range(from, to),
-    queryFn: ({ signal }) => listBudgets({ from, to }, signal),
-    enabled,
+    queryFn: ({ signal }) => listBudgets(signal),
   });
 }
 
@@ -61,19 +42,13 @@ export function useCashflowQuery(from: IsoMonth, to: IsoMonth) {
 const MONTH_PAGE_LIMIT = 100;
 
 /**
- * All transactions over an inclusive [from,to] date range, paged on the server
- * cursor and flattened. The per-category filter is applied client-side (the
- * list API has no category filter) -- at household volume a window is at most a
- * few pages. Used by the recategorize drill-down; `useMonthTransactions` wraps
- * this for the single-month case and the budget-range view passes the active
- * [from,to] so the drill-down covers the SAME window its spend was computed
- * over (budget-range feature, Section 9.3 C).
+ * All transactions of one calendar month, paged on the server cursor and
+ * flattened. Used by the recategorize drill-down; the per-category filter is
+ * applied client-side (the list API has no category filter) -- at household
+ * volume a month is at most a few pages.
  */
-export function useRangeTransactions(
-  from: IsoDate,
-  to: IsoDate,
-  enabled = true,
-) {
+export function useMonthTransactions(month: IsoMonth, enabled = true) {
+  const { from, to } = monthDateRange(month);
   const query = useInfiniteQuery({
     queryKey: queryKeys.transactions.list({ from, to, limit: MONTH_PAGE_LIMIT }),
     queryFn: ({ pageParam, signal }) =>
@@ -95,13 +70,4 @@ export function useRangeTransactions(
   );
 
   return { ...query, transactions };
-}
-
-/**
- * All transactions of one calendar month -- the month-windowed wrapper over
- * `useRangeTransactions`.
- */
-export function useMonthTransactions(month: IsoMonth, enabled = true) {
-  const { from, to } = monthDateRange(month);
-  return useRangeTransactions(from, to, enabled);
 }

@@ -208,34 +208,6 @@ describe('runCategorization transfer handling', () => {
     assert.equal(applied[0]!.categoryType, 'EXPENSE');
   });
 
-  it('honors a markTransfer rule: forces isTransfer=true even when the txn was isTransfer=false', async () => {
-    // The durability fix -- the daily sync now applies the rule's transfer
-    // ACTION, not just its category. Without it, a card-payment SimpleFIN feeds
-    // as isTransfer=false would land back in the spend index every sync.
-    const applied: ApplyCategoryInput[] = [];
-    const store = fakeStore({
-      categories: [makeCategory('transfers', 'TRANSFER')],
-      rules: [
-        makeRule('r-cardpay', 'contains', 'capital one', 'transfers', {
-          markTransfer: true,
-        }),
-      ],
-      // isTransfer omitted -> false (the SimpleFIN default for these rows).
-      txns: [makeTxn('t1', 'Capital One Payment')],
-      applied,
-    });
-
-    const result = await runCategorization({}, { config, store, invoker: neverInvoker });
-
-    assert.equal(result.ruleCategorized, 1);
-    assert.equal(applied.length, 1);
-    const input = applied[0]!;
-    assert.equal(input.categoryId, 'transfers');
-    assert.equal(input.categoryType, 'TRANSFER');
-    // Both transfer signals now coherent: flag forced true, TRANSFER category.
-    assert.equal(input.isTransfer, true);
-  });
-
   it('keeps unmatched transfers out of the Bedrock residual entirely', async () => {
     const applied: ApplyCategoryInput[] = [];
     const store = fakeStore({

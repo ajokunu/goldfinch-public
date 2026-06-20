@@ -37,13 +37,6 @@
         "EXPO_PUBLIC_COGNITO_DOMAIN": "https://goldfinch-login.auth.us-east-1.amazoncognito.com",
         "EXPO_PUBLIC_COGNITO_CLIENT_ID": "4l7isp37vh76mu4eqvr32ck8i8"
       }
-    },
-    "production-apk": {
-      "extends": "production",
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      }
     }
   },
   "submit": {

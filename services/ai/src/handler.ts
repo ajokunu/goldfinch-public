@@ -54,7 +54,7 @@ import { parseTxnSk } from '@goldfinch/shared/keys';
 import { createLogger } from '@goldfinch/shared/logger';
 import type { Logger } from '@goldfinch/shared/logger';
 import { toCurrencyDecimalString } from '@goldfinch/shared/money';
-import { findMatchingRule, ruleMarksTransfer } from '@goldfinch/shared/rules';
+import { findMatchingRule } from '@goldfinch/shared/rules';
 import type {
   CategoryItem,
   IsoDate,
@@ -279,11 +279,7 @@ export async function runCategorization(
           // The store derives the sparse GSI2 spend-index keys from these via
           // the shared computeGsi2Keys rule (transfers never index as spend).
           categoryType: category.type,
-          // Honor the rule's transfer-marking ACTION (parity with the API
-          // apply-now route): a markTransfer rule sets isTransfer=true so the
-          // row is evicted from the spend index and excluded by either signal,
-          // even if it already carried isTransfer=false.
-          isTransfer: txn.isTransfer === true || ruleMarksTransfer(match),
+          isTransfer: txn.isTransfer === true,
           now: isoTimestamp(now),
         });
     if (applied) {

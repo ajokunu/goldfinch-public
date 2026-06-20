@@ -182,43 +182,4 @@ describe('GET /reports/flow', () => {
     expect((await handler(flowEvent('2026-13'))).statusCode).toBe(400);
     expect((await handler(flowEvent('May'))).statusCode).toBe(400);
   });
-
-  // Two-signal transfer-exclusion lock (credit-card payoff): a transfer leaves
-  // BOTH income and expense (and the per-category donut) on EITHER signal.
-  it('excludes TRANSFER-category rows from income, expense, AND the donut (either sign)', async () => {
-    mockData([
-      // Funding deposit (positive) under a TRANSFER category: not income.
-      makeTxnItem({ SK: 'TXN#2026-05-01#fund', amountMinor: 120_000, categoryId: 'cc-payment' }),
-      // Card payment (negative) under a TRANSFER category: not expense, not a slice.
-      makeTxnItem({ SK: 'TXN#2026-05-02#cc', amountMinor: -120_000, categoryId: 'cc-payment' }),
-      // A real expense so the donut is otherwise non-empty.
-      makeTxnItem({ SK: 'TXN#2026-05-03#food', amountMinor: -4_000, categoryId: 'groceries' }),
-    ]);
-    const body = parseBody<ReportsFlowResponse>(await handler(flowEvent('2026-05')));
-    const usd = body.perCurrency[0]!;
-    expect(usd.incomeMinor).toBe(0);
-    expect(usd.expenseMinor).toBe(4_000);
-    // The cc-payment category must never appear as a spend slice.
-    expect(usd.categories.map((c) => c.categoryId)).toEqual(['groceries']);
-  });
-
-  it('excludes isTransfer=true rows from flow regardless of category type', async () => {
-    mockData([
-      makeTxnItem({
-        SK: 'TXN#2026-05-01#cc',
-        amountMinor: -120_000,
-        categoryId: 'groceries',
-        isTransfer: true,
-      }),
-      makeTxnItem({
-        SK: 'TXN#2026-05-02#fund',
-        amountMinor: 120_000,
-        categoryId: 'salary',
-        isTransfer: true,
-      }),
-    ]);
-    const body = parseBody<ReportsFlowResponse>(await handler(flowEvent('2026-05')));
-    // No currency slice at all — every row was excluded.
-    expect(body.perCurrency).toEqual([]);
-  });
 });

@@ -65,7 +65,7 @@ describe('P11-5 Activity date-scope', () => {
     expect(ranges[0]).toEqual(windowFor('monthly'));
   });
 
-  it('This Week sets the current Monday..Sunday window on the wire', async () => {
+  it('This Week sets the current Sunday..Saturday window on the wire', async () => {
     const { ranges } = mockRoutes();
 
     renderWithProviders(<TransactionsScreen />);

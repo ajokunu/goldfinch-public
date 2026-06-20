@@ -35,7 +35,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { Check, Eye, EyeOff, Fingerprint, LogOut, Wind } from 'lucide-react-native';
+import { Check, EyeOff, Fingerprint, LogOut, Wind } from 'lucide-react-native';
 import {
   PROFILE_DISPLAY_NAME_MAX_LENGTH,
   PROFILE_DISPLAY_NAME_MIN_LENGTH,
@@ -312,8 +312,6 @@ export default function SettingsScreen() {
   const setReduceAnimations = useUiStore((s) => s.setReduceAnimations);
   const privacyMode = useUiStore((s) => s.privacyMode);
   const setPrivacyMode = useUiStore((s) => s.setPrivacyMode);
-  const showAmountsOnWidget = useUiStore((s) => s.showAmountsOnWidget);
-  const setShowAmountsOnWidget = useUiStore((s) => s.setShowAmountsOnWidget);
   // The toggle mirrors the OS reduced-motion flag until the user overrides
   // it; the stored override then wins (motionMath.resolveReduceMotion).
   const osReducedMotion = useReducedMotion();
@@ -410,21 +408,6 @@ export default function SettingsScreen() {
               onValueChange={setPrivacyMode}
               trackColor={{ true: theme.colors.accent }}
               testID="privacy-mode-switch"
-            />
-          }
-        />
-      </Card>
-      <Card style={[styles.rowCard, styles.motionCard]}>
-        <ListRow
-          label={t('Show amounts on widget')}
-          sub={t('Display spending totals on the home screen widget')}
-          icon={Eye}
-          right={
-            <Switch
-              value={showAmountsOnWidget}
-              onValueChange={setShowAmountsOnWidget}
-              trackColor={{ true: theme.colors.accent }}
-              testID="show-amounts-on-widget-switch"
             />
           }
         />

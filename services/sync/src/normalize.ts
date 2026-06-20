@@ -26,7 +26,7 @@ import {
   normalizeTransaction,
 } from '@goldfinch/shared/simplefin';
 import { isLiabilityType } from '@goldfinch/shared/types';
-import type { AccountType, TxnPointerItem } from '@goldfinch/shared/types';
+import type { TxnPointerItem } from '@goldfinch/shared/types';
 
 import type { SyncAccountItem, SyncTransactionItem } from './types.js';
 
@@ -50,23 +50,10 @@ export function normalizeForSync(
 
   for (const account of accountSet.accounts) {
     const base = normalizeAccount(account, ctx);
-    // Durable investment classification: SimpleFIN exposes no account type, so
-    // we derive it from actual holdings. The MX/SimpleFIN bridge attaches an
-    // EMPTY `holdings: []` to ordinary bank and card accounts, so mere presence
-    // of the array is NOT a signal -- only an account that actually holds at
-    // least one position is an investment account. This is the single
-    // derivation; the Investments tab never has to be hand-fed account ids. An
-    // explicit ACCOUNT_TYPES_JSON mapping still wins (admin override), and the
-    // P8-4 user `typeOverride` still wins at the effective-type layer.
-    const reportsHoldings = Array.isArray(account.holdings) && account.holdings.length > 0;
-    const hasConfiguredType = ctx.accountTypes?.[account.id] !== undefined;
-    const accountType: AccountType =
-      reportsHoldings && !hasConfiguredType ? 'investment' : base.accountType;
     const enriched: SyncAccountItem = {
       ...base,
-      accountType,
       balanceRaw: account.balance,
-      isLiability: isLiabilityType(accountType),
+      isLiability: isLiabilityType(base.accountType),
     };
     const availableRaw = account['available-balance'];
     if (availableRaw !== undefined) {

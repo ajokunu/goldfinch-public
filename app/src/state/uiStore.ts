@@ -54,19 +54,6 @@ export interface UiState {
    */
   privacyMode: boolean;
   /**
-   * Dashboard Accounts-card grouping toggle (Type vs Bank). PERSISTED so the
-   * user's last choice survives reloads; defaults to 'type'.
-   */
-  accountGrouping: AccountGrouping;
-  /**
-   * Widget privacy toggle: "Show amounts on widget" (Settings > Privacy, default
-   * ON). PERSISTED. When OFF, the weekly-spend widget snapshot carries
-   * showAmounts=false so the (native) home-screen widget renders an amount-less
-   * indicator. SEPARATE from the per-session privacy-mode eye (privacyMode +
-   * valuesRevealed) above.
-   */
-  showAmountsOnWidget: boolean;
-  /**
    * Session-only reveal. NOT persisted (absent from partialize), so every
    * cold open starts hidden when privacyMode is on - the "open hidden"
    * contract. The header eye toggles this; it has no effect when privacyMode
@@ -79,16 +66,7 @@ export interface UiState {
   setLanguage(value: LanguageSetting): void;
   setReduceAnimations(value: boolean | null): void;
   setPrivacyMode(value: boolean): void;
-  setAccountGrouping(value: AccountGrouping): void;
-  setShowAmountsOnWidget(value: boolean): void;
   toggleValuesRevealed(): void;
-}
-
-/** Dashboard Accounts-card grouping toggle (Type vs Bank). */
-export type AccountGrouping = 'type' | 'institution';
-
-function isAccountGrouping(value: unknown): value is AccountGrouping {
-  return value === 'type' || value === 'institution';
 }
 
 export const useUiStore = create<UiState>()(
@@ -100,8 +78,6 @@ export const useUiStore = create<UiState>()(
       language: 'system',
       reduceAnimations: null,
       privacyMode: false,
-      accountGrouping: 'type',
-      showAmountsOnWidget: true,
       valuesRevealed: false,
       setThemeOverride: (value) => set({ themeOverride: value }),
       setThemeDirection: (value) => set({ themeDirection: value }),
@@ -112,8 +88,6 @@ export const useUiStore = create<UiState>()(
       // turning it off makes reveal moot.
       setPrivacyMode: (value) =>
         set({ privacyMode: value, valuesRevealed: false }),
-      setAccountGrouping: (value) => set({ accountGrouping: value }),
-      setShowAmountsOnWidget: (value) => set({ showAmountsOnWidget: value }),
       toggleValuesRevealed: () =>
         set((s) => ({ valuesRevealed: !s.valuesRevealed })),
     }),
@@ -127,8 +101,6 @@ export const useUiStore = create<UiState>()(
         language: state.language,
         reduceAnimations: state.reduceAnimations,
         privacyMode: state.privacyMode,
-        accountGrouping: state.accountGrouping,
-        showAmountsOnWidget: state.showAmountsOnWidget,
         // valuesRevealed is intentionally NOT persisted: every open re-hides.
       }),
       // Persisted values come from disk and may predate or postdate this
@@ -186,15 +158,6 @@ export const useUiStore = create<UiState>()(
             typeof incoming.privacyMode === 'boolean'
               ? incoming.privacyMode
               : current.privacyMode,
-          // Junk (or an absent pre-this-build field) keeps the 'type' default.
-          accountGrouping: isAccountGrouping(incoming.accountGrouping)
-            ? incoming.accountGrouping
-            : current.accountGrouping,
-          // Absent pre-widget-build field rehydrates to the ON default.
-          showAmountsOnWidget:
-            typeof incoming.showAmountsOnWidget === 'boolean'
-              ? incoming.showAmountsOnWidget
-              : current.showAmountsOnWidget,
         };
       },
       // P7-10: zustand swallows rehydration errors unless a handler is

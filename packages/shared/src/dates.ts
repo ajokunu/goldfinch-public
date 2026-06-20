@@ -84,10 +84,9 @@ export function isoDateInTz(date: Date, tz: string): IsoDate {
 
 /**
  * The day of the week of `date` in the given IANA time zone, as 0=Sunday ..
- * 6=Saturday. `periodWindow`'s weekly window converts this to a Monday-start
- * ISO week. Derived from the same Intl/tz machinery as `isoDateInTz` rather than
- * `Date#getUTCDay`, so an instant near midnight ET is attributed to its ET
- * calendar day.
+ * 6=Saturday (the US convention used by `periodWindow`'s weekly window). Derived
+ * from the same Intl/tz machinery as `isoDateInTz` rather than `Date#getUTCDay`,
+ * so an instant near midnight ET is attributed to its ET calendar day.
  */
 export function weekdayInTz(date: Date, tz: string): number {
   if (Number.isNaN(date.getTime())) {

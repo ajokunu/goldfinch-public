@@ -26,9 +26,7 @@ import {
   type TransactionFactoryInput,
 } from '@goldfinch/testing';
 import {
-  effectiveAccountName,
   effectiveAccountType,
-  effectiveInstitution,
   effectiveIsLiability,
 } from '@goldfinch/shared/accountTypes';
 import { toCurrencyDecimalString } from '@goldfinch/shared/money';
@@ -40,14 +38,11 @@ import type {
   CashflowResponse,
   CategoryDto,
   CurrencyCode,
-  EpochSeconds,
   FlowCategoryDto,
   GoalDto,
-  HoldingDto,
   IsoDate,
   IsoMonth,
   ListAccountsResponse,
-  ListHoldingsResponse,
   ListBudgetsResponse,
   ListCategoriesResponse,
   ListGoalsResponse,
@@ -86,14 +81,9 @@ export function makeAccountDto(
   // and the fixture can never disagree with the precedence rule.
   const dto: AccountDto = {
     accountId: item.simplefinAccountId,
-    // EFFECTIVE name/institution ride the SAME shared helpers the server uses
-    // (label/institution overrides injected through input.overrides flow through
-    // automatically); the raw synced values stay available for the subtitle.
-    name: effectiveAccountName(item),
-    syncedName: item.name,
-    institution: effectiveInstitution(item),
-    syncedInstitution: item.institution,
+    name: item.name,
     accountType: item.accountType,
+    institution: item.institution,
     balance: balance.decimal,
     balanceMinor: balance.minor,
     currency: item.currency,
@@ -102,12 +92,6 @@ export function makeAccountDto(
     accountTypeId: effectiveAccountType(item),
     isLiability: effectiveIsLiability(item),
   };
-  if (item.nameOverride !== undefined) {
-    dto.nameOverride = item.nameOverride;
-  }
-  if (item.institutionOverride !== undefined) {
-    dto.institutionOverride = item.institutionOverride;
-  }
   if (item.availableBalanceMinor !== undefined) {
     const available = pair(item.availableBalanceMinor, item.currency);
     dto.availableBalance = available.decimal;
@@ -371,75 +355,6 @@ export function makeGoalDto(input: GoalInput): GoalDto {
 }
 
 // ---------------------------------------------------------------------------
-// Holdings (DTO-typed; no item factory exists for this domain). Every
-// decimal/minor money pair rides the shared toCurrencyDecimalString helper so
-// the fixture cannot drift from its minor units; shares stay exact strings.
-// ---------------------------------------------------------------------------
-
-export interface HoldingInput {
-  holdingId: string;
-  accountId?: string;
-  symbol?: string;
-  description?: string;
-  shares?: string;
-  marketValueMinor: MinorUnits;
-  /** Omit to model a holding with no reported cost basis. */
-  costBasisMinor?: MinorUnits;
-  /** Source of the effective cost basis (present iff costBasisMinor is). */
-  costBasisSource?: 'manual' | 'feed';
-  /** Current price per share in minor units (Investments enrichment, Part B). */
-  currentPriceMinor?: MinorUnits;
-  currency?: CurrencyCode;
-  asOf?: EpochSeconds;
-}
-
-export function makeHoldingDto(input: HoldingInput): HoldingDto {
-  const currency = input.currency ?? 'USD';
-  const marketValue = pair(input.marketValueMinor, currency);
-  const dto: HoldingDto = {
-    holdingId: input.holdingId,
-    accountId: input.accountId ?? 'acct-brokerage',
-    description: input.description ?? 'Position',
-    shares: input.shares ?? '1',
-    marketValue: marketValue.decimal,
-    marketValueMinor: marketValue.minor,
-    currency,
-    asOf: input.asOf ?? TEST_BALANCE_EPOCH,
-  };
-  if (input.symbol !== undefined) dto.symbol = input.symbol;
-  if (input.costBasisMinor !== undefined) {
-    const costBasis = pair(input.costBasisMinor, currency);
-    dto.costBasis = costBasis.decimal;
-    dto.costBasisMinor = costBasis.minor;
-    // Default a present basis to a feed source so fixtures model the common
-    // "synced basis" case; tests set 'manual' explicitly when needed.
-    dto.costBasisSource = input.costBasisSource ?? 'feed';
-    // Server emits gain/percentReturn whenever an effective basis exists.
-    const gainMinor = marketValue.minor - costBasis.minor;
-    const gain = pair(gainMinor, currency);
-    dto.gain = gain.decimal;
-    dto.gainMinor = gain.minor;
-    if (costBasis.minor !== 0) {
-      dto.percentReturn = Number((BigInt(gainMinor) * 100n) / BigInt(costBasis.minor));
-    }
-  }
-  if (input.currentPriceMinor !== undefined) {
-    const price = pair(input.currentPriceMinor, currency);
-    dto.currentPrice = price.decimal;
-    dto.currentPriceMinor = price.minor;
-  }
-  return dto;
-}
-
-/** GET /accounts/{id}/holdings response. `supported:false` => no positions. */
-export function makeHoldingsResponse(
-  items: HoldingDto[],
-  holdingsSupported = true,
-): ListHoldingsResponse {
-  return { items, holdingsSupported };
-}
-
-// ---------------------------------------------------------------------------
 // Reports: net-worth history, trends, flow, cashflow (DTO-typed)
 // ---------------------------------------------------------------------------
 
@@ -610,7 +525,6 @@ export type {
   ListBudgetsResponse,
   ListCategoriesResponse,
   ListGoalsResponse,
-  ListHoldingsResponse,
   ListRecurringResponse,
   ListTransactionsResponse,
 };

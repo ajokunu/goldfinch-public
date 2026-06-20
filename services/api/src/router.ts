@@ -50,11 +50,7 @@ import {
   patchGoal,
 } from './routes/goals.js';
 import { health } from './routes/health.js';
-import {
-  holdingPriceHistory,
-  listAccountHoldings,
-  setHoldingCostBasis,
-} from './routes/holdings.js';
+import { listAccountHoldings } from './routes/holdings.js';
 import { importTransactions } from './routes/import.js';
 import { netWorthHistory } from './routes/networth.js';
 import { getProfile, patchProfile } from './routes/profile.js';
@@ -107,8 +103,6 @@ export const routes: Readonly<Record<string, RouteHandler>> = {
   [API_ROUTES.deleteGoal]: deleteGoal,
   [API_ROUTES.createGoalContribution]: createGoalContribution,
   [API_ROUTES.listAccountHoldings]: listAccountHoldings,
-  [API_ROUTES.setHoldingCostBasis]: setHoldingCostBasis,
-  [API_ROUTES.holdingPriceHistory]: holdingPriceHistory,
   [API_ROUTES.netWorthHistory]: netWorthHistory,
   [API_ROUTES.reportsTrends]: reportsTrends,
   [API_ROUTES.reportsFlow]: reportsFlow,

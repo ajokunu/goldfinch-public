@@ -20,17 +20,8 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import {
-  Building2,
-  ChevronLeft,
-  ChevronRight,
-  PencilLine,
-  Receipt,
-  Shapes,
-  Type,
-} from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, PencilLine, Shapes } from 'lucide-react-native';
 import type { AccountTypeId } from '@goldfinch/shared/accountTypes';
-import { MAX_TEXT_LENGTHS } from '@goldfinch/shared/constants';
 
 import { usePatchAccount } from '../../src/api/mutations';
 import {
@@ -46,7 +37,6 @@ import { Money } from '../../src/ui/Money';
 import { EmptyState, ErrorState, LoadingState } from '../../src/ui/States';
 import { formatAsOf } from '../../src/lib/dates';
 import { useAccountQuery, useHoldingsQuery } from './hooks/useAccountDetail';
-import { AccountTextEditSheet } from './components/AccountTextEditSheet';
 import { AccountTypeSheet } from './components/AccountTypeSheet';
 import { HoldingsTable } from './components/HoldingsTable';
 import { accountTypeLabel } from './lib/format';
@@ -74,45 +64,14 @@ function AccountDetailBody({ accountId }: { accountId: string }) {
   const holdingsQuery = useHoldingsQuery(accountId);
   const account = accountQuery.data;
 
-  // P8-4 account-type editing + label/institution overrides: one shared
-  // optimistic PATCH (rolled back on any error inside the mutation; the failure
-  // is logged there). `editing` records which field's edit is in flight so the
-  // inline rollback note attaches to the right row -- the mutation is shared, so
-  // patchMutation.isError alone cannot tell the three editors apart.
+  // P8-4 account-type editing: optimistic PATCH (rolled back on any error
+  // inside the mutation; the failure is logged there).
   const [typeSheetOpen, setTypeSheetOpen] = useState(false);
-  const [nameSheetOpen, setNameSheetOpen] = useState(false);
-  const [institutionSheetOpen, setInstitutionSheetOpen] = useState(false);
-  const [editing, setEditing] = useState<
-    'type' | 'name' | 'institution' | null
-  >(null);
   const patchMutation = usePatchAccount();
-
   const selectType = (accountTypeId: AccountTypeId): void => {
     setTypeSheetOpen(false);
     if (account === undefined || accountTypeId === account.accountTypeId) return;
-    setEditing('type');
     patchMutation.mutate({ accountId, body: { accountType: accountTypeId } });
-  };
-
-  // Empty/whitespace draft clears the override (send null -> revert to synced);
-  // a non-empty draft sets the trimmed override. The sheet closes immediately so
-  // the row reflects the optimistic value behind it (same as the type editor);
-  // a failure rolls back and surfaces the inline note under the row.
-  const saveOverride = (
-    field: 'name' | 'institution',
-    setOpen: (open: boolean) => void,
-  ) => (draft: string): void => {
-    setOpen(false);
-    const trimmed = draft.trim();
-    const next = trimmed.length > 0 ? trimmed : null;
-    setEditing(field);
-    patchMutation.mutate({
-      accountId,
-      body:
-        field === 'name'
-          ? { nameOverride: next }
-          : { institutionOverride: next },
-    });
   };
 
   const goBack = (): void => {
@@ -339,68 +298,6 @@ function AccountDetailBody({ accountId }: { accountId: string }) {
             ]}
           >
             <ListRow
-              label="Name"
-              icon={Type}
-              sub={
-                accountQuery.data.nameOverride !== undefined
-                  ? `from ${accountQuery.data.syncedName}`
-                  : undefined
-              }
-              onPress={() => setNameSheetOpen(true)}
-              right={
-                <View style={styles.typeValue}>
-                  <Text
-                    numberOfLines={1}
-                    style={{
-                      color: theme.colors.textSecondary,
-                      fontSize: theme.text.caption,
-                      maxWidth: 150,
-                    }}
-                  >
-                    {accountQuery.data.name}
-                  </Text>
-                  <ChevronRight size={17} color={theme.colors.textFaint} />
-                </View>
-              }
-            />
-            {patchMutation.isError && editing === 'name' ? (
-              <Text style={[styles.rowError, { color: theme.colors.danger, fontSize: theme.text.caption }]}>
-                The name could not be updated. Your change was undone.
-              </Text>
-            ) : null}
-
-            <ListRow
-              label="Institution"
-              icon={Building2}
-              sub={
-                accountQuery.data.institutionOverride !== undefined
-                  ? `from ${accountQuery.data.syncedInstitution}`
-                  : undefined
-              }
-              onPress={() => setInstitutionSheetOpen(true)}
-              right={
-                <View style={styles.typeValue}>
-                  <Text
-                    numberOfLines={1}
-                    style={{
-                      color: theme.colors.textSecondary,
-                      fontSize: theme.text.caption,
-                      maxWidth: 150,
-                    }}
-                  >
-                    {accountQuery.data.institution}
-                  </Text>
-                  <ChevronRight size={17} color={theme.colors.textFaint} />
-                </View>
-              }
-            />
-            {patchMutation.isError && editing === 'institution' ? (
-              <Text style={[styles.rowError, { color: theme.colors.danger, fontSize: theme.text.caption }]}>
-                The institution could not be updated. Your change was undone.
-              </Text>
-            ) : null}
-
-            <ListRow
               label="Account type"
               icon={Shapes}
               onPress={() => setTypeSheetOpen(true)}
@@ -418,22 +315,18 @@ function AccountDetailBody({ accountId }: { accountId: string }) {
                 </View>
               }
             />
-            {patchMutation.isError && editing === 'type' ? (
-              <Text style={[styles.rowError, { color: theme.colors.danger, fontSize: theme.text.caption }]}>
+            {patchMutation.isError ? (
+              <Text
+                style={{
+                  color: theme.colors.danger,
+                  fontSize: theme.text.caption,
+                  paddingHorizontal: theme.spacing.sm,
+                  paddingBottom: theme.spacing.sm,
+                }}
+              >
                 The account type could not be updated. Your change was undone.
               </Text>
             ) : null}
-
-            <ListRow
-              label="View transactions"
-              icon={Receipt}
-              onPress={() =>
-                router.push({
-                  pathname: '/transactions',
-                  params: { accountId },
-                })
-              }
-            />
           </View>
 
           <Text
@@ -455,40 +348,12 @@ function AccountDetailBody({ accountId }: { accountId: string }) {
       />
 
       {account !== undefined ? (
-        <>
-          <AccountTextEditSheet
-            visible={nameSheetOpen}
-            onClose={() => setNameSheetOpen(false)}
-            title="Name"
-            prefill={account.nameOverride ?? ''}
-            placeholder={account.syncedName}
-            hint="Leave blank to use the name from your bank."
-            maxLength={MAX_TEXT_LENGTHS.accountName}
-            saving={patchMutation.isPending && editing === 'name'}
-            error={null}
-            onSave={saveOverride('name', setNameSheetOpen)}
-            testID="account-name-input"
-          />
-          <AccountTextEditSheet
-            visible={institutionSheetOpen}
-            onClose={() => setInstitutionSheetOpen(false)}
-            title="Institution"
-            prefill={account.institutionOverride ?? ''}
-            placeholder={account.syncedInstitution}
-            hint="Leave blank to use the bank from your sync."
-            maxLength={MAX_TEXT_LENGTHS.accountInstitution}
-            saving={patchMutation.isPending && editing === 'institution'}
-            error={null}
-            onSave={saveOverride('institution', setInstitutionSheetOpen)}
-            testID="account-institution-input"
-          />
-          <AccountTypeSheet
-            visible={typeSheetOpen}
-            onClose={() => setTypeSheetOpen(false)}
-            selected={account.accountTypeId}
-            onSelect={selectType}
-          />
-        </>
+        <AccountTypeSheet
+          visible={typeSheetOpen}
+          onClose={() => setTypeSheetOpen(false)}
+          selected={account.accountTypeId}
+          onSelect={selectType}
+        />
       ) : null}
     </Screen>
   );
@@ -504,5 +369,4 @@ const styles = StyleSheet.create({
   metaLine: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
   summaryHead: { flexDirection: 'row', alignItems: 'center' },
   typeValue: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  rowError: { paddingHorizontal: 8, paddingBottom: 8 },
 });

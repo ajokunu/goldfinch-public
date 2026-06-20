@@ -5,18 +5,10 @@
  */
 
 import {
-  effectiveAccountName,
   effectiveAccountType,
-  effectiveInstitution,
   effectiveIsLiability,
 } from '@goldfinch/shared/accountTypes';
 import { percentUsed } from '@goldfinch/shared/budgetMath';
-import {
-  effectiveCostBasisMinor,
-  holdingGainMinor,
-  holdingPercentReturn,
-} from '@goldfinch/shared/holdingBasis';
-import { pricePerShareMinor } from '@goldfinch/shared/holdingReturn';
 import { KEY_PREFIX, parseTxnSk } from '@goldfinch/shared/keys';
 import {
   toCurrencyDecimalString,
@@ -36,11 +28,8 @@ import type {
   GoalContributionItem,
   GoalDto,
   GoalItem,
-  HoldingBasisItem,
   HoldingDto,
   HoldingItem,
-  HoldingPricePointDto,
-  HoldingPriceSnapshotItem,
   MinorUnits,
   NetWorthSnapshotDto,
   NetWorthSnapshotItem,
@@ -65,15 +54,9 @@ export function accountIdFromSk(sk: string): string {
 export function toAccountDto(item: AccountItem): AccountDto {
   const dto: AccountDto = {
     accountId: accountIdFromSk(item.SK),
-    // EFFECTIVE display name/institution via the shared helpers — the only
-    // legal place the override-vs-synced precedence is computed. Never inline
-    // `item.nameOverride ?? item.name` here. The raw synced values ride along
-    // as `syncedName`/`syncedInstitution` for the "renamed from" subtitle.
-    name: effectiveAccountName(item),
-    syncedName: item.name,
+    name: item.name,
     accountType: item.accountType,
-    institution: effectiveInstitution(item),
-    syncedInstitution: item.institution,
+    institution: item.institution,
     balance: toCurrencyDecimalString(item.balanceMinor, item.currency),
     balanceMinor: item.balanceMinor,
     currency: item.currency,
@@ -84,14 +67,6 @@ export function toAccountDto(item: AccountItem): AccountDto {
     accountTypeId: effectiveAccountType(item, logger),
     isLiability: effectiveIsLiability(item, logger),
   };
-  // USER-OWNED overrides surfaced only when stored (edit-screen prefill /
-  // "renamed" indicator), keeping un-overridden accounts at their prior shape.
-  if (item.nameOverride !== undefined) {
-    dto.nameOverride = item.nameOverride;
-  }
-  if (item.institutionOverride !== undefined) {
-    dto.institutionOverride = item.institutionOverride;
-  }
   if (item.availableBalanceMinor !== undefined) {
     dto.availableBalance = toCurrencyDecimalString(
       item.availableBalanceMinor,
@@ -113,11 +88,8 @@ export function toAccountDto(item: AccountItem): AccountDto {
 export function toSummaryAccount(item: AccountItem): SummaryAccount {
   return {
     accountId: accountIdFromSk(item.SK),
-    // EFFECTIVE name/institution; same shared helpers as toAccountDto, so a
-    // renamed account shows its custom label everywhere (and the by-institution
-    // grouping in /summary keys on the effective institution).
-    name: effectiveAccountName(item),
-    institution: effectiveInstitution(item),
+    name: item.name,
+    institution: item.institution,
     accountType: item.accountType,
     // P8-4 effective values; same shared helpers as toAccountDto.
     accountTypeId: effectiveAccountType(item, logger),
@@ -181,30 +153,22 @@ export function budgetPeriod(item: BudgetItem): BudgetPeriod {
  * from `periodWindow(budgetPeriod(item))` (P11-3). The same window is echoed as
  * `periodFrom`/`periodTo` so the client labels "this week" / "June" / "2026"
  * without recomputing — the spend figure and its window are always one pair.
- *
- * `targetMinor` overrides the budget's per-period cap for the DTO's `limitMinor`
- * (budget-range feature, Decision 2). Default (per-cadence) mode omits it, so the
- * stored `item.limitMinor` flows through unchanged; range mode passes the prorated
- * target so the DTO carries "the target over this range" while the shape and
- * `remainingMinor = limitMinor - spentMinor` invariant are unchanged.
  */
 export function toBudgetDto(
   item: BudgetItem,
   spentMinor: MinorUnits,
   window: PeriodWindow,
   categoryName?: string,
-  targetMinor?: MinorUnits,
 ): BudgetDto {
-  const limitMinor = targetMinor ?? item.limitMinor;
-  const remainingMinor = limitMinor - spentMinor;
+  const remainingMinor = item.limitMinor - spentMinor;
   return {
     categoryId: item.categoryId,
     categoryName,
     period: budgetPeriod(item),
     periodFrom: window.from,
     periodTo: window.to,
-    limit: budgetMoney(limitMinor),
-    limitMinor,
+    limit: budgetMoney(item.limitMinor),
+    limitMinor: item.limitMinor,
     rollover: item.rollover,
     spent: budgetMoney(spentMinor),
     spentMinor,
@@ -293,24 +257,7 @@ export function toGoalContributionDto(item: GoalContributionItem): GoalContribut
   return dto;
 }
 
-/**
- * Fractional-share scale for the BigInt current-price division. `shares` is a
- * DecimalString (e.g. "12.5"); parsed at this scale to an integer count so the
- * division `marketValueMinor / shares` stays exact (no float). 6 digits covers
- * any realistic fractional share count.
- */
-/**
- * Map a HoldingItem to its DTO, joining the USER-OWNED manual cost basis
- * (`basis`, the HOLDING_BASIS item for this (accountId, symbol), or undefined).
- *
- * The caller (listAccountHoldings / setHoldingCostBasis) is responsible for the
- * SAME-CURRENCY guard: it must only pass a `basis` whose `currency` matches the
- * holding's, so `gain = marketValueMinor - costBasisMinor` is same-currency
- * (P7-7). The effective-basis precedence and the signed gain/percent math come
- * exclusively from the shared @goldfinch/shared/holdingBasis helpers — never
- * inline — so the API value and the client optimistic projection agree.
- */
-export function toHoldingDto(item: HoldingItem, basis?: HoldingBasisItem): HoldingDto {
+export function toHoldingDto(item: HoldingItem): HoldingDto {
   const dto: HoldingDto = {
     holdingId: item.holdingId,
     accountId: item.accountId,
@@ -324,41 +271,10 @@ export function toHoldingDto(item: HoldingItem, basis?: HoldingBasisItem): Holdi
   if (item.symbol !== undefined) {
     dto.symbol = item.symbol;
   }
-
-  // Current price per share = marketValue / shares, from the single shared
-  // helper — the SAME math the sync daily price snapshot uses, so the displayed
-  // price and the charted history cannot drift. Omitted when shares is
-  // non-numeric or <= 0, never a divide-by-zero or a misleading price (Part B).
-  const currentPriceMinor = pricePerShareMinor(item.marketValueMinor, item.shares);
-  if (currentPriceMinor !== undefined) {
-    dto.currentPriceMinor = currentPriceMinor;
-    dto.currentPrice = toCurrencyDecimalString(currentPriceMinor, item.currency);
+  if (item.costBasisMinor !== undefined) {
+    dto.costBasis = toCurrencyDecimalString(item.costBasisMinor, item.currency);
+    dto.costBasisMinor = item.costBasisMinor;
   }
-
-  // Effective cost basis (manual ?? feed-non-zero ?? undefined) + its source,
-  // from the single shared helper. The DTO carries gain/percentReturn ONLY when
-  // an effective basis exists (otherwise the client renders the em-dash).
-  const effective = effectiveCostBasisMinor(
-    {
-      manualCostBasisMinor: basis?.costBasisMinor,
-      feedCostBasisMinor: item.costBasisMinor,
-    },
-    logger,
-  );
-  if (effective !== undefined) {
-    dto.costBasis = toCurrencyDecimalString(effective.costBasisMinor, item.currency);
-    dto.costBasisMinor = effective.costBasisMinor;
-    dto.costBasisSource = effective.source;
-
-    const gainMinor = holdingGainMinor(item.marketValueMinor, effective.costBasisMinor);
-    dto.gainMinor = gainMinor;
-    dto.gain = toCurrencyDecimalString(gainMinor, item.currency);
-    const percentReturn = holdingPercentReturn(gainMinor, effective.costBasisMinor);
-    if (percentReturn !== undefined) {
-      dto.percentReturn = percentReturn;
-    }
-  }
-
   return dto;
 }
 
@@ -393,19 +309,6 @@ export function toNetWorthSnapshotDto(item: NetWorthSnapshotItem): NetWorthSnaps
 }
 
 /**
- * Map a daily price snapshot to its DTO (money pair). The server returns the
- * RAW price series; the client normalizes it to a % return via the single
- * shared holdingReturn helper, so no normalization happens here.
- */
-export function toHoldingPricePointDto(item: HoldingPriceSnapshotItem): HoldingPricePointDto {
-  return {
-    date: item.date,
-    pricePerShare: toCurrencyDecimalString(item.pricePerShareMinor, item.currency),
-    pricePerShareMinor: item.pricePerShareMinor,
-  };
-}
-
-/**
  * Rule amount bounds are stored in minor units; like budgets they use the
  * household base-currency scale (2 digits) for the decimal rendering.
  */
@@ -426,11 +329,6 @@ export function toRuleDto(item: RuleItem): RuleDto {
   if (item.amountMaxMinor !== undefined && item.amountMaxMinor !== null) {
     dto.amountMax = budgetMoney(item.amountMaxMinor);
     dto.amountMaxMinor = item.amountMaxMinor;
-  }
-  // Only surfaced when stored, keeping pre-transfer-rule DTOs at their original
-  // wire shape (absent => not a transfer-marking rule).
-  if (item.markTransfer !== undefined) {
-    dto.markTransfer = item.markTransfer;
   }
   return dto;
 }

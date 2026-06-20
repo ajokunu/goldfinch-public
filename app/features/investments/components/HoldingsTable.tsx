@@ -8,7 +8,7 @@
  * that currency reports a cost basis; a partial sum would understate it.
  */
 import { StyleSheet, Text, View } from 'react-native';
-import type { HoldingDto } from '@goldfinch/shared/types';
+import type { CurrencyCode, HoldingDto } from '@goldfinch/shared/types';
 
 import { useTheme } from '../../../src/ui/ThemeProvider';
 import { Money } from '../../../src/ui/Money';
@@ -16,12 +16,39 @@ import { formatMinorAmount } from '../../../src/ui/CurrencyAmount';
 import { useMaskMoney } from '../../../src/state/uiStore';
 import { formatAsOf } from '../../../src/lib/dates';
 import { formatShares } from '../lib/format';
-// Single source for the per-currency totals (§9.2): the aggregate tab and this
-// per-account table fold cost basis the SAME way, so they cannot diverge.
-import { totalsByCurrencyHoldings } from '../lib/aggregate';
 
 export interface HoldingsTableProps {
   holdings: HoldingDto[];
+}
+
+interface CurrencyTotals {
+  currency: CurrencyCode;
+  marketValueMinor: number;
+  costBasisMinor: number;
+  /** False when any holding in this currency lacks a cost basis. */
+  costBasisComplete: boolean;
+}
+
+function totalsByCurrency(holdings: HoldingDto[]): CurrencyTotals[] {
+  const map = new Map<CurrencyCode, CurrencyTotals>();
+  for (const holding of holdings) {
+    const existing = map.get(holding.currency) ?? {
+      currency: holding.currency,
+      marketValueMinor: 0,
+      costBasisMinor: 0,
+      costBasisComplete: true,
+    };
+    existing.marketValueMinor += holding.marketValueMinor;
+    if (holding.costBasisMinor === undefined) {
+      existing.costBasisComplete = false;
+    } else {
+      existing.costBasisMinor += holding.costBasisMinor;
+    }
+    map.set(holding.currency, existing);
+  }
+  return [...map.values()].sort((a, b) =>
+    a.currency < b.currency ? -1 : a.currency > b.currency ? 1 : 0,
+  );
 }
 
 const NO_VALUE = '—'; // em dash
@@ -33,7 +60,7 @@ export function HoldingsTable({ holdings }: HoldingsTableProps) {
   // mode masks the totals here.
   const { mask } = useMaskMoney();
 
-  const totals = totalsByCurrencyHoldings(holdings);
+  const totals = totalsByCurrency(holdings);
   const multiCurrency = totals.length > 1;
   const newestAsOf = holdings.reduce(
     (max, holding) => (holding.asOf > max ? holding.asOf : max),
@@ -74,10 +101,10 @@ export function HoldingsTable({ holdings }: HoldingsTableProps) {
           },
         ]}
       >
-        <Text numberOfLines={1} style={[styles.symbolCol, headerStyle]}>Symbol</Text>
-        <Text numberOfLines={1} style={[styles.sharesCol, styles.right, headerStyle]}>Shares</Text>
-        <Text numberOfLines={1} style={[styles.valueCol, styles.right, headerStyle]}>Value</Text>
-        <Text numberOfLines={1} style={[styles.valueCol, styles.right, headerStyle]}>Cost basis</Text>
+        <Text style={[styles.symbolCol, headerStyle]}>Symbol</Text>
+        <Text style={[styles.sharesCol, styles.right, headerStyle]}>Shares</Text>
+        <Text style={[styles.valueCol, styles.right, headerStyle]}>Value</Text>
+        <Text style={[styles.valueCol, styles.right, headerStyle]}>Cost basis</Text>
       </View>
 
       {holdings.map((holding) => (
@@ -109,7 +136,6 @@ export function HoldingsTable({ holdings }: HoldingsTableProps) {
             </Text>
           </View>
           <Text
-            numberOfLines={1}
             style={[
               styles.sharesCol,
               styles.right,
@@ -209,9 +235,9 @@ export function HoldingsTable({ holdings }: HoldingsTableProps) {
 const styles = StyleSheet.create({
   card: { borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center' },
-  symbolCol: { flex: 1.9, paddingRight: 6 },
-  sharesCol: { flex: 1.1 },
-  valueCol: { flex: 1.5, paddingLeft: 6 },
+  symbolCol: { flex: 2.1, paddingRight: 6 },
+  sharesCol: { flex: 1 },
+  valueCol: { flex: 1.4, paddingLeft: 6 },
   right: { textAlign: 'right' },
   rightAlign: { alignItems: 'flex-end' },
   tabular: { fontVariant: ['tabular-nums'] },

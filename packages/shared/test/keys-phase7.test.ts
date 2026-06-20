@@ -11,8 +11,6 @@ import {
   contribPrefix,
   contribSk,
   goalSk,
-  holdingBasisPrefix,
-  holdingBasisSk,
   holdingPrefix,
   holdingSk,
   importTxnPointerPrefix,
@@ -33,7 +31,6 @@ describe('phase-7 sort-key builders', () => {
       'CONTRIB#goal-1#2026-06-09T12:00:00Z',
     );
     assert.equal(holdingSk('acct-1', 'hold-1'), 'HOLDING#acct-1#hold-1');
-    assert.equal(holdingBasisSk('acct-1', 'VTSAX'), 'HOLDINGBASIS#acct-1#VTSAX');
     assert.equal(netWorthSk('2026-06-09'), 'NETWORTH#2026-06-09');
     assert.equal(ruleSk('rule-1'), 'RULE#rule-1');
     assert.equal(attachSk('txn-1', 'att-1'), 'ATTACH#txn-1#att-1');
@@ -47,7 +44,6 @@ describe('phase-7 sort-key builders', () => {
   it('expose begins_with prefixes that match the builders', () => {
     assert.equal(contribPrefix('goal-1'), 'CONTRIB#goal-1#');
     assert.equal(holdingPrefix('acct-1'), 'HOLDING#acct-1#');
-    assert.equal(holdingBasisPrefix('acct-1'), 'HOLDINGBASIS#acct-1#');
     assert.equal(attachPrefix('txn-1'), 'ATTACH#txn-1#');
     assert.equal(importTxnPointerPrefix('imp-1'), 'TXNPTR#import:imp-1:');
     assert.ok(contribSk('goal-1', 'ts').startsWith(contribPrefix('goal-1')));
@@ -59,16 +55,6 @@ describe('phase-7 sort-key builders', () => {
     assert.ok(importTxnPointerSk('a', 'b').startsWith(KEY_PREFIX.importTxnPointer));
     // Import pointers deliberately live inside the TXNPTR# namespace.
     assert.ok(KEY_PREFIX.importTxnPointer.startsWith(KEY_PREFIX.txnPointer));
-    assert.ok(holdingBasisSk('acct-1', 'VTSAX').startsWith(holdingBasisPrefix('acct-1')));
-    assert.ok(holdingBasisSk('acct-1', 'VTSAX').startsWith(KEY_PREFIX.holdingBasis));
-  });
-
-  it('holding-basis symbol allows "." and "-" (valid ticker chars) but rejects "#"', () => {
-    // '.' and '-' are valid ticker characters; only '#' corrupts the composite key.
-    assert.equal(holdingBasisSk('acct-1', 'BRK.B'), 'HOLDINGBASIS#acct-1#BRK.B');
-    assert.equal(holdingBasisSk('acct-1', 'ABC-D'), 'HOLDINGBASIS#acct-1#ABC-D');
-    assert.throws(() => holdingBasisSk('acct-1', 'BAD#SYM'), KeyError);
-    assert.throws(() => holdingBasisSk('acct#1', 'VTSAX'), KeyError);
   });
 
   it('reject empty components and "#" injection', () => {
@@ -77,9 +63,6 @@ describe('phase-7 sort-key builders', () => {
     assert.throws(() => contribSk('goal-1', 'bad#ts'), KeyError);
     assert.throws(() => holdingSk('acct#1', 'h'), KeyError);
     assert.throws(() => holdingSk('acct-1', ''), KeyError);
-    assert.throws(() => holdingBasisSk('acct-1', 'sym#bol'), KeyError);
-    assert.throws(() => holdingBasisSk('acct-1', ''), KeyError);
-    assert.throws(() => holdingBasisPrefix(''), KeyError);
     assert.throws(() => ruleSk('rule#1'), KeyError);
     assert.throws(() => attachSk('txn-1', 'att#1'), KeyError);
     assert.throws(() => pushTokenSk('dev#1'), KeyError);
@@ -122,9 +105,6 @@ describe('mutation hardening (P7-10)', () => {
       [() => holdingSk('', 'h-1'), 'accountId'],
       [() => holdingSk('acct-1', ''), 'holdingId'],
       [() => holdingPrefix(''), 'accountId'],
-      [() => holdingBasisSk('', 'VTSAX'), 'accountId'],
-      [() => holdingBasisSk('acct-1', ''), 'symbol'],
-      [() => holdingBasisPrefix(''), 'accountId'],
       [() => ruleSk(''), 'ruleId'],
       [() => importTxnPointerSk('', 'hash'), 'importId'],
       [() => importTxnPointerSk('imp-1', ''), 'rowHash'],

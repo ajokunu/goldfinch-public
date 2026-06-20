@@ -1,9 +1,0 @@
-{
-  "platforms": ["ios", "android"],
-  "ios": {
-    "modules": ["WidgetBridgeModule"]
-  },
-  "android": {
-    "modules": ["com.tabletales.goldfinch.widgetbridge.WidgetBridgeModule"]
-  }
-}

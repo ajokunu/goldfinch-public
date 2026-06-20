@@ -1,16 +1,14 @@
 /**
- * Window flow-aggregation tests (lib/spend.ts; P11-5 This Week donut).
- * windowFlowByCurrency reshapes the periodWindow('weekly') transactions slice
- * into the exact /reports/flow per-currency / per-category structure the
- * dashboard donut consumes. Expected totals are hand-computed integer-minor
- * literals (R16 posture), never recomputed with the helper under test.
+ * Window spend-aggregation tests (lib/spend.ts; P11-5 This Week figure).
+ * Expected totals are hand-computed integer-minor literals (R16 posture),
+ * never recomputed with the helper under test.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import type { CategoryType, TransactionDto } from '@goldfinch/shared/types';
+import type { TransactionDto } from '@goldfinch/shared/types';
 
-import { windowFlowByCurrency } from '../lib/spend.js';
+import { windowExpenseByCurrency } from '../lib/spend.js';
 
 let seq = 0;
 
@@ -34,75 +32,27 @@ function txn(overrides: Partial<TransactionDto> = {}): TransactionDto {
   };
 }
 
-/** Resolver mirroring the real id -> name lookup over a few categories. */
-const NAMES: Readonly<Record<string, string>> = {
-  groceries: 'Groceries',
-  dining: 'Dining out',
-  rent: 'Rent',
-  transfers: 'Transfers',
-};
-const nameFor = (categoryId: string): string | undefined => NAMES[categoryId];
-
-/**
- * Type resolver mirroring the SpendingCard useCategoriesQuery lookup. Only the
- * 'transfers' slug is TRANSFER; everything else is EXPENSE/INCOME or unknown
- * (undefined for an archived/missing id, treated as "not a transfer").
- */
-const TYPES: Readonly<Record<string, CategoryType>> = {
-  groceries: 'EXPENSE',
-  dining: 'EXPENSE',
-  rent: 'EXPENSE',
-  transfers: 'TRANSFER',
-};
-const typeFor = (categoryId: string): CategoryType | undefined => TYPES[categoryId];
-
-describe('windowFlowByCurrency', () => {
-  it('buckets expense magnitudes per category, names resolved, sorted desc', () => {
-    const groups = windowFlowByCurrency(
-      [
-        txn({ categoryId: 'dining', amountMinor: -1_200 }),
-        txn({ categoryId: 'groceries', amountMinor: -4_215 }),
-        txn({ categoryId: 'dining', amountMinor: -800 }),
-        txn({ categoryId: 'groceries', amountMinor: -1_000 }),
-      ],
-      nameFor,
-      typeFor,
-    );
-    assert.equal(groups.length, 1);
-    const group = groups[0]!;
-    assert.equal(group.currency, 'USD');
-    // expenseMinor = 4215 + 1000 + 1200 + 800 = 7215.
-    assert.equal(group.expenseMinor, 7_215);
-    assert.deepEqual(group.categories, [
-      { categoryId: 'groceries', categoryName: 'Groceries', amount: '', amountMinor: 5_215 },
-      { categoryId: 'dining', categoryName: 'Dining out', amount: '', amountMinor: 2_000 },
+describe('windowExpenseByCurrency', () => {
+  it('sums expense magnitudes, excluding income and transfers', () => {
+    const result = windowExpenseByCurrency([
+      txn({ amountMinor: -4_215 }), // expense
+      txn({ amountMinor: -1_200 }), // expense
+      txn({ amountMinor: 250_000 }), // income -> excluded
+      txn({ amountMinor: 0 }), // zero -> excluded
+      txn({ amountMinor: -50_000, isTransfer: true }), // transfer -> excluded
     ]);
+    assert.deepEqual(result, [{ currency: 'USD', expenseMinor: 5_415 }]);
   });
 
-  it('puts the null category in an "Uncategorized" bucket', () => {
-    const groups = windowFlowByCurrency(
-      [
-        txn({ categoryId: null, amountMinor: -500 }),
-        txn({ categoryId: 'rent', amountMinor: -300 }),
-      ],
-      nameFor,
-      typeFor,
-    );
-    const group = groups[0]!;
-    assert.deepEqual(group.categories, [
-      { categoryId: null, categoryName: 'Uncategorized', amount: '', amountMinor: 500 },
-      { categoryId: 'rent', categoryName: 'Rent', amount: '', amountMinor: 300 },
+  it('groups per currency in first-seen order', () => {
+    const result = windowExpenseByCurrency([
+      txn({ amountMinor: -1_000, currency: 'USD' }),
+      txn({ amountMinor: -2_000, currency: 'EUR' }),
+      txn({ amountMinor: -500, currency: 'USD' }),
     ]);
-  });
-
-  it('falls back to the categoryId when its name cannot be resolved', () => {
-    const groups = windowFlowByCurrency(
-      [txn({ categoryId: 'archived-cat', amountMinor: -700 })],
-      nameFor,
-      typeFor,
-    );
-    assert.deepEqual(groups[0]!.categories, [
-      { categoryId: 'archived-cat', categoryName: 'archived-cat', amount: '', amountMinor: 700 },
+    assert.deepEqual(result, [
+      { currency: 'USD', expenseMinor: 1_500 },
+      { currency: 'EUR', expenseMinor: 2_000 },
     ]);
   });
 
@@ -113,6 +63,22 @@ describe('windowFlowByCurrency', () => {
         txn({ categoryId: 'rent', amountMinor: 250_000 }), // income -> excluded
         txn({ categoryId: 'dining', amountMinor: 0 }), // zero -> excluded
         txn({ categoryId: 'rent', amountMinor: -50_000, isTransfer: true }), // transfer -> excluded
+      ],
+      nameFor,
+      typeFor,
+    );
+    assert.equal(groups.length, 1);
+    assert.equal(groups[0]!.expenseMinor, 1_000);
+    assert.deepEqual(groups[0]!.categories, [
+      { categoryId: 'groceries', categoryName: 'Groceries', amount: '', amountMinor: 1_000 },
+    ]);
+  });
+
+  it('excludes a pending expense leg (parity with server flow/cashflow)', () => {
+    const groups = windowFlowByCurrency(
+      [
+        txn({ categoryId: 'groceries', amountMinor: -1_000 }), // posted -> counts
+        txn({ categoryId: 'dining', amountMinor: -9_999, pending: true }), // pending -> excluded
       ],
       nameFor,
       typeFor,
@@ -156,73 +122,15 @@ describe('windowFlowByCurrency', () => {
 
   it('returns an empty list when no expenses are present', () => {
     assert.deepEqual(
-      windowFlowByCurrency(
-        [
-          txn({ amountMinor: 9_999 }), // income only
-          txn({ amountMinor: -1, isTransfer: true }), // transfer only
-        ],
-        nameFor,
-        typeFor,
-      ),
+      windowExpenseByCurrency([
+        txn({ amountMinor: 9_999 }), // income only
+        txn({ amountMinor: -1, isTransfer: true }), // transfer only
+      ]),
       [],
     );
   });
 
   it('returns an empty list for no transactions', () => {
-    assert.deepEqual(windowFlowByCurrency([], nameFor, typeFor), []);
-  });
-
-  it('excludes a TRANSFER-categorized expense even when isTransfer is false', () => {
-    // The credit-card-payoff parity case: a negative row filed under a TRANSFER
-    // category but with the per-row flag still unset. The server flow/cashflow
-    // drop it; the weekly donut must too.
-    const groups = windowFlowByCurrency(
-      [
-        txn({ categoryId: 'groceries', amountMinor: -1_000 }), // real expense
-        txn({ categoryId: 'transfers', amountMinor: -120_000, isTransfer: false }), // cc payment
-      ],
-      nameFor,
-      typeFor,
-    );
-    assert.equal(groups.length, 1);
-    assert.equal(groups[0]!.expenseMinor, 1_000);
-    assert.deepEqual(groups[0]!.categories, [
-      { categoryId: 'groceries', categoryName: 'Groceries', amount: '', amountMinor: 1_000 },
-    ]);
-  });
-
-  it('still excludes an isTransfer=true row whose category is not TRANSFER', () => {
-    // Belt-and-suspenders: the per-row flag alone excludes, independent of type.
-    const groups = windowFlowByCurrency(
-      [
-        txn({ categoryId: 'groceries', amountMinor: -1_000 }),
-        txn({ categoryId: 'groceries', amountMinor: -50_000, isTransfer: true }),
-      ],
-      nameFor,
-      typeFor,
-    );
-    assert.equal(groups[0]!.expenseMinor, 1_000);
-  });
-
-  it('treats an unknown/archived category type as not-a-transfer (counts normally)', () => {
-    // typeFor returns undefined for 'archived-cat'; the negative non-transfer
-    // row counts as spend, matching the server's sign fallback.
-    const groups = windowFlowByCurrency(
-      [txn({ categoryId: 'archived-cat', amountMinor: -700 })],
-      nameFor,
-      typeFor,
-    );
-    assert.equal(groups[0]!.expenseMinor, 700);
-  });
-
-  it('does not exclude a positive TRANSFER row as spend (income is already dropped)', () => {
-    // A funding deposit (positive) is dropped by the income guard; the TRANSFER
-    // guard never even runs on it. No spend is produced.
-    const groups = windowFlowByCurrency(
-      [txn({ categoryId: 'transfers', amountMinor: 120_000, isTransfer: false })],
-      nameFor,
-      typeFor,
-    );
-    assert.deepEqual(groups, []);
+    assert.deepEqual(windowExpenseByCurrency([]), []);
   });
 });

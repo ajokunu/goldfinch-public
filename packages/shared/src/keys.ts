@@ -21,7 +21,6 @@
  *   GOAL#<goalId>                   savings goal (P7-2)
  *   CONTRIB#<goalId>#<ts>           manual goal contribution, timestamp-sorted (P7-2)
  *   HOLDING#<accountId>#<holdingId> investment holding snapshot (P7-3)
- *   HOLDINGBASIS#<accountId>#<symbol> user-owned manual cost basis (sync-safe)
  *   NETWORTH#<yyyy-mm-dd>           daily net-worth snapshot (P7-4)
  *   RULE#<ruleId>                   categorization rule, shared contract (P7-5)
  *   TXNPTR#import:<importId>:<rowHash>  CSV-import idempotency pointer (P7-6)
@@ -55,8 +54,6 @@ export type RecurringSk = `RECURRING#${string}`;
 export type GoalSk = `GOAL#${string}`;
 export type ContribSk = `CONTRIB#${string}#${string}`;
 export type HoldingSk = `HOLDING#${string}#${string}`;
-export type HoldingBasisSk = `HOLDINGBASIS#${string}#${string}`;
-export type HoldingPriceSnapshotSk = `HOLDINGPRICE#${string}#${string}#${string}`;
 export type NetWorthSk = `NETWORTH#${string}`;
 export type RuleSk = `RULE#${string}`;
 export type ImportTxnPointerSk = `TXNPTR#import:${string}:${string}`;
@@ -79,8 +76,6 @@ export const KEY_PREFIX = {
   goal: 'GOAL#',
   contribution: 'CONTRIB#',
   holding: 'HOLDING#',
-  holdingBasis: 'HOLDINGBASIS#',
-  holdingPrice: 'HOLDINGPRICE#',
   netWorth: 'NETWORTH#',
   rule: 'RULE#',
   /**
@@ -329,79 +324,6 @@ export function holdingSk(accountId: string, holdingId: string): HoldingSk {
 export function holdingPrefix(accountId: string): `HOLDING#${string}#` {
   assertComponent('accountId', accountId);
   return `HOLDING#${accountId}#`;
-}
-
-/**
- * User-owned manual cost-basis SK: HOLDINGBASIS#<accountId>#<symbol>. Keyed on
- * the STABLE (accountId, symbol) identity, NOT holdingId (raw SimpleFIN wire.id
- * has no in-repo stability guarantee and can churn across syncs, orphaning the
- * entry). Written only by the API; sync never enumerates this SK, so the item
- * survives every holdings overwrite by construction (no allow-list entry).
- * `symbol` reuses `assertComponent`, which rejects '#' (the SET route mirrors
- * that guard); '.'/'-' are valid ticker characters and pass.
- */
-export function holdingBasisSk(accountId: string, symbol: string): HoldingBasisSk {
-  assertComponent('accountId', accountId);
-  assertComponent('symbol', symbol);
-  return `HOLDINGBASIS#${accountId}#${symbol}`;
-}
-
-/** `begins_with` prefix over one account's manual cost-basis items. */
-export function holdingBasisPrefix(accountId: string): `HOLDINGBASIS#${string}#` {
-  assertComponent('accountId', accountId);
-  return `HOLDINGBASIS#${accountId}#`;
-}
-
-/**
- * Daily price-per-share snapshot SK: HOLDINGPRICE#<accountId>#<symbol>#<date>.
- * Keyed on the STABLE (accountId, symbol) identity (like holdingBasisSk) plus
- * the calendar date, so a begins_with(holdingPricePrefix) query returns one
- * position's price history in chronological order. Written only by sync and
- * never enumerated by the holdings-replace logic, so it survives every sync.
- */
-export function holdingPriceSnapshotSk(
-  accountId: string,
-  symbol: string,
-  date: IsoDate,
-): HoldingPriceSnapshotSk {
-  assertComponent('accountId', accountId);
-  assertComponent('symbol', symbol);
-  assertIsoDate(date);
-  return `HOLDINGPRICE#${accountId}#${symbol}#${date}`;
-}
-
-/** `begins_with` prefix over one position's daily price snapshots. */
-export function holdingPricePrefix(
-  accountId: string,
-  symbol: string,
-): `HOLDINGPRICE#${string}#${string}#` {
-  assertComponent('accountId', accountId);
-  assertComponent('symbol', symbol);
-  return `HOLDINGPRICE#${accountId}#${symbol}#`;
-}
-
-/**
- * Inclusive SK bounds for `SK BETWEEN :start AND :end` over one position's daily
- * price snapshots in [from, to] (same sentinel mechanics as
- * netWorthDateRangeBounds).
- */
-export function holdingPriceHistoryBounds(
-  accountId: string,
-  symbol: string,
-  from: IsoDate,
-  to: IsoDate,
-): KeyRangeBounds {
-  assertComponent('accountId', accountId);
-  assertComponent('symbol', symbol);
-  assertIsoDate(from);
-  assertIsoDate(to);
-  if (from > to) {
-    throw new KeyError(`from (${from}) must not be after to (${to})`);
-  }
-  return {
-    start: `HOLDINGPRICE#${accountId}#${symbol}#${from}`,
-    end: `HOLDINGPRICE#${accountId}#${symbol}#${to}${SK_UPPER_BOUND}`,
-  };
 }
 
 export function netWorthSk(date: IsoDate): NetWorthSk {

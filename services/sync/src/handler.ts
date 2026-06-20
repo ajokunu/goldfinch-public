@@ -58,7 +58,6 @@ import {
   loadHoldingsSupportFlags,
 } from './holdings.js';
 import { emitSyncMetrics, type MetricsWriter, type SyncMetrics } from './metrics.js';
-import { writeHoldingPriceSnapshots } from './holdingSnapshot.js';
 import { writeNetWorthSnapshot } from './networth.js';
 import { normalizeForSync } from './normalize.js';
 import { runRecurrencePass } from './recurring.js';
@@ -298,17 +297,6 @@ export function createHandler(deps: HandlerDeps = {}) {
         household: env.householdId,
         now: nowDate,
         baseCurrency: env.baseCurrency,
-        logger,
-      });
-
-      // Investments chart: daily price-per-share snapshots from the stored
-      // HOLDING# items (one per position with a symbol + derivable price,
-      // idempotent per calendar day). Additive; never touches HOLDING#/ACCT#.
-      await writeHoldingPriceSnapshots({
-        docClient: ddb,
-        tableName: env.tableName,
-        household: env.householdId,
-        now: nowDate,
         logger,
       });
 

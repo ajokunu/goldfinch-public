@@ -12,18 +12,17 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type {
   CategoryDto,
   CurrencyCode,
-  IsoDate,
   IsoMonth,
   TransactionDto,
 } from '@goldfinch/shared/types';
 
-import { localeTag, rangeLabel, useLang, useT } from '../../../src/i18n';
+import { localeTag, useLang, useT } from '../../../src/i18n';
 import { Badge } from '../../../src/ui/Badge';
 import { Money } from '../../../src/ui/Money';
 import { useTheme } from '../../../src/ui/ThemeProvider';
 import { errorMessage } from '../lib/errors';
-import { isoMonthLabel, monthDateRange } from '../../../src/lib/dates';
-import { useRangeTransactions } from '../hooks/useBudgetQueries';
+import { isoMonthLabel } from '../../../src/lib/dates';
+import { useMonthTransactions } from '../hooks/useBudgetQueries';
 import { useRecategorizeTransaction } from '../hooks/useBudgetMutations';
 import { Button } from './Buttons';
 import { CategoryPickerModal } from './CategoryPickerModal';
@@ -38,14 +37,7 @@ export interface CategoryTransactionsTarget {
 
 export interface CategoryTransactionsModalProps {
   target: CategoryTransactionsTarget | null;
-  /** Single-month window (default mode). */
   month: IsoMonth;
-  /**
-   * Explicit inclusive [from,to] window (budget-range feature, Section 9.3 C).
-   * When set, the drill-down lists the WHOLE range -- the same window the row's
-   * spend-vs-target was computed over -- instead of `month`.
-   */
-  range?: { from: IsoDate; to: IsoDate } | null;
   currency: CurrencyCode;
   onClose: () => void;
 }
@@ -53,7 +45,6 @@ export interface CategoryTransactionsModalProps {
 export function CategoryTransactionsModal({
   target,
   month,
-  range,
   currency,
   onClose,
 }: CategoryTransactionsModalProps) {
@@ -61,9 +52,7 @@ export function CategoryTransactionsModal({
   const t = useT();
   const lang = useLang();
   const visible = target !== null;
-  // Range mode lists the active [from,to]; default mode lists the month.
-  const window = range ?? monthDateRange(month);
-  const monthTxns = useRangeTransactions(window.from, window.to, visible);
+  const monthTxns = useMonthTransactions(month, visible);
   const recategorize = useRecategorizeTransaction();
 
   const [pickingFor, setPickingFor] = useState<TransactionDto | null>(null);
@@ -93,11 +82,7 @@ export function CategoryTransactionsModal({
     <>
       <ModalSheet
         visible={visible && pickingFor === null}
-        title={`${target.title} — ${
-          range
-            ? rangeLabel(lang, range.from, range.to, localeTag(lang))
-            : isoMonthLabel(month, localeTag(lang))
-        }`}
+        title={`${target.title} — ${isoMonthLabel(month, localeTag(lang))}`}
         onClose={onClose}
       >
         {actionError ? (
@@ -125,12 +110,8 @@ export function CategoryTransactionsModal({
             title="No transactions"
             body={
               target.categoryId === null
-                ? range
-                  ? 'Everything in this range is categorized.'
-                  : 'Everything this month is categorized.'
-                : range
-                  ? 'Nothing in this category for this range.'
-                  : 'Nothing in this category this month.'
+                ? 'Everything this month is categorized.'
+                : 'Nothing in this category this month.'
             }
           />
         ) : (

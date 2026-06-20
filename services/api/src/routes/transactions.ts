@@ -637,6 +637,7 @@ export async function patchTransaction(
     names['#categoryId'] = 'categoryId';
     names['#userCategorized'] = 'userCategorized';
     names['#categorizedBy'] = 'categorizedBy';
+    names['#isTransfer'] = 'isTransfer';
     names['#gsi2pk'] = 'GSI2PK';
     names['#gsi2sk'] = 'GSI2SK';
     values[':categoryId'] = categoryId;
@@ -647,11 +648,19 @@ export async function patchTransaction(
       '#userCategorized = :true',
       '#categorizedBy = :user',
     );
+    // Keep isTransfer coherent with the category type: assigning a TRANSFER
+    // category marks the row a transfer so EVERY consumer (the client weekly
+    // donut, server flow/cashflow) excludes it from spend without relying on a
+    // category-type lookup that can race category loading. Monotonic-OR: a row
+    // already flagged isTransfer (e.g. a markTransfer rule) stays a transfer.
+    const effectiveIsTransfer = category!.type === 'TRANSFER' || existing.isTransfer === true;
+    values[':isTransfer'] = effectiveIsTransfer;
+    sets.push('#isTransfer = :isTransfer');
     const gsi2Keys = computeGsi2Keys({
       household,
       categoryId,
       categoryType: category!.type,
-      isTransfer: existing.isTransfer === true,
+      isTransfer: effectiveIsTransfer,
       date,
       txnId,
     });

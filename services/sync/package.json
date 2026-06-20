@@ -12,7 +12,8 @@
     "claim-token": "tsx scripts/claim-simplefin-token.ts",
     "verify-simplefin": "tsx scripts/verify-simplefin.ts",
     "backfill-dates": "tsx scripts/backfill-transacted-date.ts",
-    "fix-contributions": "tsx scripts/fix-retirement-contributions.ts"
+    "fix-contributions": "tsx scripts/fix-retirement-contributions.ts",
+    "backfill-transfer-flag": "tsx scripts/backfill-transfer-flag.ts"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.600.0",

@@ -33,7 +33,6 @@ import {
   Settings,
   SlidersHorizontal,
   Target,
-  TrendingUp,
   type LucideProps,
 } from 'lucide-react-native';
 
@@ -51,7 +50,6 @@ interface SidebarEntry {
     | '/'
     | '/transactions'
     | '/budget'
-    | '/investments'
     | '/reports'
     | '/more/goals'
     | '/more/recurring'
@@ -65,10 +63,6 @@ const PRIMARY: readonly SidebarEntry[] = [
   { label: 'Dashboard', icon: LayoutDashboard, href: '/' },
   { label: 'Transactions', icon: ArrowDownUp, href: '/transactions' },
   { label: 'Budget', icon: PieChart, href: '/budget' },
-  // Desktop sidebar uses lucide chrome (the row passes strokeWidth); the
-  // phosphor identity glyph is the mobile tab's job. TrendingUp reads as the
-  // investments-growth destination at the sidebar's 19px size.
-  { label: 'Investments', icon: TrendingUp, href: '/investments' },
   { label: 'Reports', icon: ChartLine, href: '/reports' },
   { label: 'Goals', icon: Target, href: '/more/goals' },
   { label: 'Recurring', icon: Repeat, href: '/more/recurring' },

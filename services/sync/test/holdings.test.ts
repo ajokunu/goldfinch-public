@@ -95,7 +95,6 @@ describe('ingestHoldings', () => {
     expect(vti?.shares).toBe('21.5000'); // decimal string, never a float
     expect(vti?.marketValueMinor).toBe(623456);
     expect(vti?.costBasisMinor).toBe(500000);
-    expect(vti?.purchasePriceMinor).toBe(20000); // feed purchase_price, captured when non-zero
     expect(vti?.currency).toBe('USD');
     expect(vti?.asOf).toBe(VTI.created); // holding's own timestamp wins
     expect(vti?.lastSyncedAt).toBe(NOW.toISOString());
@@ -104,70 +103,6 @@ describe('ingestHoldings', () => {
     expect(bnd?.asOf).toBe(BALANCE_DATE); // fallback: account balance-date
     expect(bnd?.description).toBe('BND'); // falls back to symbol
     expect(bnd?.costBasisMinor).toBeUndefined();
-    expect(bnd?.purchasePriceMinor).toBeUndefined(); // absent on the wire -> unset
-  });
-
-  it('treats a bridge-reported cost_basis of 0 as "not provided" (custodians that do not track basis send 0)', async () => {
-    const ddb = new FakeDdb();
-    const zeroBasis = { ...VTI, id: 'HOL-zerocb', cost_basis: '0.00' };
-    await ingest(ddb, [investmentAccount([zeroBasis])]);
-
-    const item = ddb.getItem(PK, holdingSk('ACT-invest-1', 'HOL-zerocb'));
-    expect(item?.marketValueMinor).toBe(623456); // the position still has market value
-    // 0 basis on a valued position means the custodian doesn't expose it -> unset,
-    // so the UI renders "—" rather than a misleading $0.00 / false 100% gain.
-    expect(item?.costBasisMinor).toBeUndefined();
-  });
-
-  it('treats a bridge-reported purchase_price of 0 as "not provided" (same zero-guard as cost_basis)', async () => {
-    const ddb = new FakeDdb();
-    const zeroPurchase = { ...VTI, id: 'HOL-zeropp', purchase_price: '0.00' };
-    await ingest(ddb, [investmentAccount([zeroPurchase])]);
-
-    const item = ddb.getItem(PK, holdingSk('ACT-invest-1', 'HOL-zeropp'));
-    expect(item?.marketValueMinor).toBe(623456); // the position still has market value
-    // 0 purchase_price is "unavailable", not a real zero-cost lot -> left unset
-    // so it never masquerades as a feed cost source.
-    expect(item?.purchasePriceMinor).toBeUndefined();
-  });
-
-  it('captures purchase_price when non-zero and omits it when absent', async () => {
-    const ddb = new FakeDdb();
-    await ingest(ddb, [investmentAccount([VTI, BND])]);
-
-    expect(
-      ddb.getItem(PK, holdingSk('ACT-invest-1', 'HOL-vti'))?.purchasePriceMinor,
-    ).toBe(20000); // VTI.purchase_price '200.00'
-    expect(
-      ddb.getItem(PK, holdingSk('ACT-invest-1', 'HOL-bnd'))?.purchasePriceMinor,
-    ).toBeUndefined(); // BND has no purchase_price on the wire
-  });
-
-  it('never touches a HOLDINGBASIS# item in the partition (replace semantics only Put/Delete HOLDING# SKs)', async () => {
-    const ddb = new FakeDdb();
-    // A user-owned manual cost-basis row lives under the same household partition
-    // but its own SK prefix. Sync only ever enumerates HOLDING# SKs, so this row
-    // must survive every ingest run untouched (sync-safe by construction).
-    const basisSk = 'HOLDINGBASIS#ACT-invest-1#VTI';
-    ddb.putItem({
-      PK,
-      SK: basisSk,
-      entityType: 'HOLDING_BASIS',
-      accountId: 'ACT-invest-1',
-      symbol: 'VTI',
-      costBasisMinor: 480000,
-      currency: 'USD',
-    });
-
-    // First ingest with positions, then a full sell-out (deletes all HOLDING#).
-    await ingest(ddb, [investmentAccount([VTI, BND])]);
-    await ingest(ddb, [investmentAccount([])]);
-
-    expect(ddb.listSks(PK, 'HOLDING#')).toHaveLength(0); // all holdings gone
-    const survived = ddb.getItem(PK, basisSk);
-    expect(survived?.entityType).toBe('HOLDING_BASIS');
-    expect(survived?.costBasisMinor).toBe(480000); // untouched by Put-fresh/Delete-stale
-    expect(ddb.listSks(PK, 'HOLDINGBASIS#')).toEqual([basisSk]);
   });
 
   it('replaces per account: positions absent from the new payload are deleted, the rest upserted', async () => {

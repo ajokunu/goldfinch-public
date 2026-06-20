@@ -44,30 +44,13 @@ import type { AttachmentContentType } from '../constants.js';
 
 export interface AccountDto {
   accountId: string;
-  /**
-   * EFFECTIVE display name (`nameOverride ?? synced`), computed server-side via
-   * the shared `effectiveAccountName()` helper only. Every display site reads
-   * this, so a rename shows everywhere automatically.
-   */
   name: string;
-  /** Raw synced name (e.g. "Quicksilver (2224)"); shown as a subtitle when a label override is set. */
-  syncedName: string;
-  /** USER-OWNED label override if set (edit-screen prefill / "renamed" indicator); absent == none. */
-  nameOverride?: string;
   /**
    * Legacy synced-type field, kept for compatibility. It may lag the user's
    * P8-4 type override — new consumers must read `accountTypeId`.
    */
   accountType: AccountType;
-  /**
-   * EFFECTIVE institution label (`institutionOverride ?? synced`), via the
-   * shared `effectiveInstitution()` helper only.
-   */
   institution: string;
-  /** Raw synced institution; shown as a subtitle when an institution override is set. */
-  syncedInstitution: string;
-  /** USER-OWNED institution override if set (edit-screen prefill); absent == none. */
-  institutionOverride?: string;
   balance: DecimalString;
   balanceMinor: MinorUnits;
   availableBalance?: DecimalString;
@@ -108,9 +91,7 @@ export type GetAccountResponse = AccountDto;
 
 export interface SummaryAccount {
   accountId: string;
-  /** EFFECTIVE display name via shared `effectiveAccountName()` (label override ?? synced). */
   name: string;
-  /** EFFECTIVE institution via shared `effectiveInstitution()`; by-institution groups key on this. */
   institution: string;
   /** Legacy synced type, kept for compatibility; prefer `accountTypeId`. */
   accountType: AccountType;
@@ -311,15 +292,6 @@ export interface BudgetDto {
   /** Inclusive end of the spent window, yyyy-mm-dd; `periodWindow(period).to`. */
   periodTo: IsoDate;
   limit: DecimalString;
-  /**
-   * The budget's target for the window the DTO covers, in integer minor units.
-   *
-   * - Default (per-cadence) mode: the stored one-period cap (`BudgetItem.limitMinor`).
-   * - Range mode (`GET /budgets?from&to`): the PRORATED target over `[from, to]`,
-   *   computed server-side via `prorateRangeTargetMinor` (budget-range feature,
-   *   Decision 2). The field name and shape are unchanged; only its meaning shifts
-   *   to "target over this range". `remainingMinor` stays `limitMinor - spentMinor`.
-   */
   limitMinor: MinorUnits;
   rollover: boolean;
   /** Current-period actuals, computed server-side from GSI2. */
@@ -332,24 +304,6 @@ export interface BudgetDto {
 
 export interface ListBudgetsResponse {
   items: BudgetDto[];
-}
-
-/**
- * Optional query parameters for GET /budgets (budget-range feature, Decision 3).
- * The single shared definition both the client (`endpoints.ts`, producer) and the
- * server route (`budgets.ts`, consumer) reference so the contract cannot drift.
- *
- * - BOTH absent: default behavior — every budget is windowed by its own cadence
- *   (`periodWindow(period)`), and `limitMinor` carries the stored one-period cap.
- * - BOTH present (inclusive yyyy-mm-dd): every budget is windowed to `[from, to]`
- *   for the spend query, and each DTO's `limitMinor` carries the prorated range
- *   target (see `BudgetDto.limitMinor`). Validation mirrors the transactions
- *   route: exactly one of from/to present, or `from > to`, is `400
- *   VALIDATION_ERROR`; a span over MAX_RANGE_DAYS (366) is `400 RANGE_TOO_LARGE`.
- */
-export interface ListBudgetsQuery {
-  from?: IsoDate;
-  to?: IsoDate;
 }
 
 /** POST /budgets — 201, or 409 ALREADY_EXISTS if the category already has one. */
@@ -688,49 +642,12 @@ export interface HoldingDto {
   description: string;
   /** Fractional share count as an exact decimal string (not money). */
   shares: DecimalString;
-  /** Effective cost basis (manual override, else feed when non-zero). */
   costBasis?: DecimalString;
   costBasisMinor?: MinorUnits;
-  /**
-   * Which source the effective `costBasis*` came from. Present iff
-   * `costBasisMinor` is present: 'manual' = the user-entered HOLDING_BASIS
-   * item; 'feed' = the SimpleFIN cost_basis fallback.
-   */
-  costBasisSource?: 'manual' | 'feed';
-  /**
-   * Current price per share = marketValue / shares, BigInt-exact in minor
-   * units (Part B). Omitted when shares <= 0 / non-numeric (no divide-by-zero).
-   */
-  currentPrice?: DecimalString;
-  currentPriceMinor?: MinorUnits;
-  /**
-   * Gain/loss = marketValue - effective cost basis (signed; may be negative).
-   * Present iff an effective cost basis exists; same-currency only (P7-7).
-   */
-  gain?: DecimalString;
-  gainMinor?: MinorUnits;
-  /**
-   * Percent return = gain / costBasis * 100, signed, truncated toward zero
-   * (so -149.7% renders -149). Present iff an effective cost basis exists and
-   * is non-zero.
-   */
-  percentReturn?: number;
   marketValue: DecimalString;
   marketValueMinor: MinorUnits;
   currency: CurrencyCode;
   asOf: EpochSeconds;
-}
-
-/**
- * POST /accounts/{accountId}/holdings/{symbol}/cost-basis — set or clear the
- * user's manual TOTAL cost basis for a position. `amount` is the decimal string
- * the user typed (parsed server-side via `parseCurrencyAmount` against the
- * holding's currency, mirroring the goals/contribution precedent). `null` (or
- * an empty/whitespace string) CLEARS the basis (deletes the HOLDING_BASIS item;
- * the row falls back to the feed value or the em-dash, never a misleading $0).
- */
-export interface SetHoldingCostBasisRequest {
-  amount: DecimalString | null;
 }
 
 /**
@@ -741,38 +658,6 @@ export interface SetHoldingCostBasisRequest {
 export interface ListHoldingsResponse {
   items: HoldingDto[];
   holdingsSupported: boolean;
-}
-
-// ---------------------------------------------------------------------------
-// Holding price history (Investments chart) —
-// GET /accounts/{accountId}/holdings/{symbol}/price-history?from&to
-// ---------------------------------------------------------------------------
-
-/** Defaults: to = today, from = earliest snapshot. Dates are yyyy-mm-dd. */
-export interface HoldingPriceHistoryQuery {
-  from?: IsoDate;
-  to?: IsoDate;
-}
-
-/**
- * One daily price-per-share snapshot for a position. Money pair as everywhere:
- * decimal string for display, integer minor units for arithmetic. The client
- * NORMALIZES these (shared holdingReturn helper) to a % return series; the
- * server stays a dumb history (like NetWorthSnapshotDto), no normalization here.
- */
-export interface HoldingPricePointDto {
-  date: IsoDate;
-  pricePerShare: DecimalString;
-  pricePerShareMinor: MinorUnits;
-}
-
-/**
- * History accrues from first deploy — `firstSnapshotDate` is null until the
- * first snapshot exists, and the chart must state its start date (no backfill).
- */
-export interface HoldingPriceHistoryResponse {
-  items: HoldingPricePointDto[];
-  firstSnapshotDate: IsoDate | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -878,11 +763,6 @@ export interface RuleDto {
   /** Lower value = higher precedence within the same matchType. */
   priority: number;
   enabled: boolean;
-  /**
-   * When true, applying this rule marks matched transactions `isTransfer=true`
-   * (excluding them from income AND spend everywhere). Absent == false.
-   */
-  markTransfer?: boolean;
   version: number;
 }
 
@@ -902,15 +782,6 @@ export interface CreateRuleRequest {
   priority?: number;
   /** Defaults to true. */
   enabled?: boolean;
-  /**
-   * When true, applying this rule marks matched transactions `isTransfer=true`.
-   * Recommended for credit-card-payment / transfer-funding rules, paired with a
-   * TRANSFER-typed `categoryId`. Defaults to false (a normal categorization
-   * rule). Leave amountMin/amountMax UNSET on transfer rules so variable-amount
-   * payments and funding deposits are all caught regardless of month-to-month
-   * amount drift.
-   */
-  markTransfer?: boolean;
 }
 
 /** PATCH /rules/{ruleId} — optimistic locking; 409 VERSION_CONFLICT on mismatch. */
@@ -923,8 +794,6 @@ export interface PatchRuleRequest {
   categoryId?: string;
   priority?: number;
   enabled?: boolean;
-  /** When true, applying this rule marks matched transactions `isTransfer=true`. */
-  markTransfer?: boolean;
   version: number;
 }
 
@@ -1140,18 +1009,6 @@ export interface PatchAccountRequest {
   accountType?: AccountTypeId;
   /** Becomes the account's isLiabilityOverride (wins over the type default). */
   isLiability?: boolean;
-  /**
-   * Becomes the account's nameOverride (custom label; effective name wins over
-   * synced). Send a non-empty string to set; send `null` (or "") to clear and
-   * fall back to the synced name. Trimmed; max MAX_TEXT_LENGTHS.accountName.
-   */
-  nameOverride?: string | null;
-  /**
-   * Becomes the account's institutionOverride (custom bank label). Send a
-   * non-empty string to set; send `null` (or "") to clear. Trimmed; max
-   * MAX_TEXT_LENGTHS.accountInstitution.
-   */
-  institutionOverride?: string | null;
 }
 
 /** 200 — the account after the write, with effective values applied. */

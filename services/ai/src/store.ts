@@ -204,13 +204,20 @@ export function createStore(options: StoreOptions): GoldFinchStore {
         ':null': null,
         ':false': false,
       };
+      // Keep isTransfer coherent with the category type (same rule as the API
+      // PATCH path): an assigned TRANSFER category marks the row a transfer so
+      // every spend consumer excludes it without a category-type lookup.
+      // Monotonic-OR: an already-flagged transfer stays one.
+      const effectiveIsTransfer = input.categoryType === 'TRANSFER' || input.isTransfer;
+      sets.push('isTransfer = :isTransfer');
+      values[':isTransfer'] = effectiveIsTransfer;
       // Single source of truth for the sparse GSI2 spend-index rule; shared
       // with the API PATCH path so the two writers can never diverge.
       const gsi2Keys = computeGsi2Keys({
         household,
         categoryId: input.categoryId,
         categoryType: input.categoryType,
-        isTransfer: input.isTransfer,
+        isTransfer: effectiveIsTransfer,
         date,
         txnId,
       });

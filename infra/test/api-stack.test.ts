@@ -1,3 +1,6 @@
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { API_ROUTES } from '../../packages/shared/src/constants';
 import { ApiStack } from '../lib/api-stack';
@@ -95,11 +98,11 @@ describe('ApiStack', () => {
     expect(corsJson).not.toContain('http://');
   });
 
-  test('the API function gets exactly the six allowed table actions', () => {
-    // DeleteItem backs DELETE /budgets/{categoryId} (hard delete of one budget
-    // item). BatchWriteItem backs DELETE /goals/{goalId}, which deletes the
-    // goal plus its contribution rows in one BatchWriteCommand; both are
-    // deliberate, reviewed grants. Scan is still forbidden.
+  test('the API function gets exactly the seven allowed table actions', () => {
+    // DeleteItem backs DELETE /budgets/{categoryId}. BatchWriteItem backs
+    // DELETE /goals/{goalId} (goal + contribution rows in one BatchWriteCommand).
+    // TransactWriteItems backs POST /import/transactions (dedupe pointer + new
+    // row atomically). All deliberate, reviewed grants. Scan is still forbidden.
     template.hasResourceProperties('AWS::IAM::Policy', {
       PolicyDocument: Match.objectLike({
         Statement: Match.arrayWith([
@@ -111,6 +114,7 @@ describe('ApiStack', () => {
               'dynamodb:GetItem',
               'dynamodb:PutItem',
               'dynamodb:Query',
+              'dynamodb:TransactWriteItems',
               'dynamodb:UpdateItem',
             ],
             Effect: 'Allow',
@@ -124,6 +128,68 @@ describe('ApiStack', () => {
     expect(json).not.toContain('ssm:GetParameter');
     expect(json).not.toContain('kms:Decrypt');
     expect(json).not.toContain('bedrock:InvokeModel');
+  });
+
+  test('route<->IAM parity: granted DynamoDB actions cover every command the API source calls', () => {
+    // Catches the class of bug where a route issues a DynamoDB command the IAM
+    // grant omits (DELETE /budgets DeleteItem historically; POST /import
+    // TransactWriteItems latently). Scans services/api/src for *Command uses,
+    // maps each to its required action, and asserts the grant is a superset.
+    const apiSrc = path.resolve(__dirname, '../../services/api/src');
+    expect(existsSync(apiSrc)).toBe(true); // fail loud if the path moved
+
+    const CMD_TO_ACTION: Record<string, string> = {
+      GetCommand: 'dynamodb:GetItem',
+      PutCommand: 'dynamodb:PutItem',
+      UpdateCommand: 'dynamodb:UpdateItem',
+      DeleteCommand: 'dynamodb:DeleteItem',
+      QueryCommand: 'dynamodb:Query',
+      BatchWriteCommand: 'dynamodb:BatchWriteItem',
+      TransactWriteCommand: 'dynamodb:TransactWriteItems',
+      ScanCommand: 'dynamodb:Scan',
+    };
+
+    const tsFiles: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.d.ts')) tsFiles.push(full);
+      }
+    };
+    walk(apiSrc);
+
+    const required = new Set<string>();
+    for (const file of tsFiles) {
+      const src = readFileSync(file, 'utf8');
+      for (const m of src.matchAll(/new ([A-Za-z]+)Command\(/g)) {
+        const cmd = `${m[1]}Command`;
+        if (cmd in CMD_TO_ACTION) required.add(CMD_TO_ACTION[cmd]!);
+        // (Non-DynamoDB SDK commands like InvokeCommand/GetParameterCommand are
+        // not in the map and are intentionally ignored here.)
+      }
+    }
+    // Guard against a vacuous pass (regex/path silently matched nothing).
+    expect(required.size).toBeGreaterThan(0);
+    expect(required.has('dynamodb:GetItem')).toBe(true);
+    // The source must never use Scan; if it ever does, surface it loudly.
+    expect(required.has('dynamodb:Scan')).toBe(false);
+
+    const policies = template.findResources('AWS::IAM::Policy');
+    const granted = new Set<string>(
+      Object.values(policies)
+        .flatMap(
+          (p) =>
+            (p as { Properties: { PolicyDocument: { Statement: Array<Record<string, unknown>> } } })
+              .Properties.PolicyDocument.Statement,
+        )
+        .filter((s) => s['Sid'] === 'GoldFinchTableAccess')
+        .flatMap((s) => s['Action'] as string[]),
+    );
+    expect(granted.size).toBeGreaterThan(0);
+    for (const action of required) {
+      expect(granted).toContain(action);
+    }
   });
 
   test('the API function may invoke EXACTLY the sync function (one ARN, no wildcard)', () => {

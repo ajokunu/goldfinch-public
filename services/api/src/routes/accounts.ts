@@ -45,14 +45,7 @@ import { getEnv } from '../env.js';
 import { ApiError, json, parseJsonBody, requirePathParam } from '../http.js';
 import { logger } from '../logger.js';
 import { toAccountDto } from '../mapping.js';
-import {
-  optBool,
-  optOverrideText,
-  optString,
-  optText,
-  reqString,
-  reqText,
-} from '../validate.js';
+import { optBool, optString, optText, reqString, reqText } from '../validate.js';
 
 const ACCOUNT_TYPES: readonly AccountType[] = [
   'checking',
@@ -198,12 +191,8 @@ type VersionedAccountItem = AccountItem & { version?: number };
  * - Identity (the household partition) comes ONLY from the JWT claims.
  * - `accountType` is validated with the shared isAccountTypeId() guard (never
  *   a hand-rolled list) and lands as the USER-OWNED typeOverride;
- *   `isLiability` must be a boolean and lands as isLiabilityOverride.
- *   `nameOverride`/`institutionOverride` are USER-OWNED custom labels: a
- *   non-empty trimmed string SETs them (length-capped via MAX_TEXT_LENGTHS,
- *   400 otherwise), and `null`/""/whitespace REMOVEs them so the effective
- *   value falls back to the synced one (shared effectiveAccountName()/
- *   effectiveInstitution()). At least one field is required (400 otherwise).
+ *   `isLiability` must be a boolean and lands as isLiabilityOverride. At
+ *   least one of the two is required (400 VALIDATION_ERROR otherwise).
  * - 404 NOT_FOUND when the account does not exist; the write itself also
  *   conditions on attribute_exists so a delete racing the read still 404s.
  * - Version-conditional: the write requires the stored version to be
@@ -237,25 +226,11 @@ export async function patchAccount(
     typeOverride = rawType;
   }
   const isLiabilityOverride = optBool(body, 'isLiability');
-  // undefined == absent (leave unchanged); null == clear (REMOVE the
-  // attribute); a string == set. Trimmed + length-capped from the shared
-  // MAX_TEXT_LENGTHS contract so client and server can never disagree.
-  const nameOverride = optOverrideText(body, 'nameOverride', 'accountName');
-  const institutionOverride = optOverrideText(
-    body,
-    'institutionOverride',
-    'accountInstitution',
-  );
-  if (
-    typeOverride === undefined &&
-    isLiabilityOverride === undefined &&
-    nameOverride === undefined &&
-    institutionOverride === undefined
-  ) {
+  if (typeOverride === undefined && isLiabilityOverride === undefined) {
     throw new ApiError(
       400,
       'VALIDATION_ERROR',
-      'at least one of accountType, isLiability, nameOverride, or institutionOverride is required',
+      'at least one of accountType or isLiability is required',
     );
   }
 
@@ -279,9 +254,6 @@ export async function patchAccount(
     ':nextVersion': (current.version ?? 0) + 1,
   };
   const sets = ['#updatedAt = :updatedAt', '#version = :nextVersion'];
-  // A cleared (null) name/institution override REMOVEs the attribute so the
-  // effective value falls back to the synced one — never stores an empty string.
-  const removes: string[] = [];
   if (typeOverride !== undefined) {
     names['#typeOverride'] = 'typeOverride';
     values[':typeOverride'] = typeOverride;
@@ -292,35 +264,10 @@ export async function patchAccount(
     values[':isLiabilityOverride'] = isLiabilityOverride;
     sets.push('#isLiabilityOverride = :isLiabilityOverride');
   }
-  if (nameOverride !== undefined) {
-    names['#nameOverride'] = 'nameOverride';
-    if (nameOverride === null) {
-      removes.push('#nameOverride');
-    } else {
-      values[':nameOverride'] = nameOverride;
-      sets.push('#nameOverride = :nameOverride');
-    }
-  }
-  if (institutionOverride !== undefined) {
-    names['#institutionOverride'] = 'institutionOverride';
-    if (institutionOverride === null) {
-      removes.push('#institutionOverride');
-    } else {
-      values[':institutionOverride'] = institutionOverride;
-      sets.push('#institutionOverride = :institutionOverride');
-    }
-  }
   let versionCondition = 'attribute_not_exists(#version)';
   if (current.version !== undefined) {
     versionCondition = '#version = :version';
     values[':version'] = current.version;
-  }
-
-  // `sets` always has the updatedAt/version bumps, so SET is unconditional;
-  // REMOVE is appended only when an override was cleared (empty clause is illegal).
-  let updateExpression = `SET ${sets.join(', ')}`;
-  if (removes.length > 0) {
-    updateExpression += ` REMOVE ${removes.join(', ')}`;
   }
 
   try {
@@ -328,7 +275,7 @@ export async function patchAccount(
       new UpdateCommand({
         TableName: env.tableName,
         Key: { PK: pk, SK: sk },
-        UpdateExpression: updateExpression,
+        UpdateExpression: `SET ${sets.join(', ')}`,
         ConditionExpression: `attribute_exists(SK) AND ${versionCondition}`,
         ExpressionAttributeNames: names,
         ExpressionAttributeValues: values,

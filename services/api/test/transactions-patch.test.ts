@@ -127,6 +127,43 @@ describe('PATCH /transactions/{txnId}', () => {
     expect(input.ExpressionAttributeValues).not.toHaveProperty(':gsi2pk');
   });
 
+  it('stamps isTransfer=true when a TRANSFER category is assigned to a non-transfer row', async () => {
+    // The transfers-in-spend fix: a genuine transfer stored with isTransfer=false
+    // (e.g. "Withdrawal to Savings") must become isTransfer=true once filed under
+    // a TRANSFER category, so every spend consumer excludes it reliably.
+    mockGets(
+      makeCategoryItem('transfer', 'TRANSFER'),
+      'transfer',
+      makeTxnItem({ SK: TXN_SK, isTransfer: false }),
+    );
+    ddbMock.on(UpdateCommand).resolves({
+      Attributes: makeTxnItem({ SK: TXN_SK, categoryId: 'transfer', isTransfer: true }),
+    });
+    const res = await handler(patchEvent({ date: '2026-05-10', categoryId: 'transfer' }));
+    expect(res.statusCode).toBe(200);
+    const input = ddbMock.commandCalls(UpdateCommand)[0]!.args[0].input;
+    expect(input.UpdateExpression).toContain('#isTransfer = :isTransfer');
+    expect(input.ExpressionAttributeValues![':isTransfer']).toBe(true);
+    expect(input.UpdateExpression).toContain('REMOVE #gsi2pk, #gsi2sk');
+  });
+
+  it('sets isTransfer=false when an EXPENSE category is assigned to a non-transfer row', async () => {
+    mockGets(
+      makeCategoryItem('groceries', 'EXPENSE'),
+      'groceries',
+      makeTxnItem({ SK: TXN_SK, isTransfer: false }),
+    );
+    ddbMock.on(UpdateCommand).resolves({
+      Attributes: makeTxnItem({ SK: TXN_SK, categoryId: 'groceries' }),
+    });
+    const res = await handler(patchEvent({ date: '2026-05-10', categoryId: 'groceries' }));
+    expect(res.statusCode).toBe(200);
+    const input = ddbMock.commandCalls(UpdateCommand)[0]!.args[0].input;
+    expect(input.ExpressionAttributeValues![':isTransfer']).toBe(false);
+    // Non-transfer EXPENSE -> still enters the spend index.
+    expect(input.UpdateExpression).toContain('#gsi2pk = :gsi2pk');
+  });
+
   it('REMOVEs the GSI2 keys when the transaction is a transfer even for an EXPENSE category', async () => {
     // The budget-inflation bug: a credit-card payment (isTransfer) PATCHed
     // into an EXPENSE category must NOT enter the GSI2 spend index.

@@ -9,7 +9,6 @@ import type {
   CategoryType,
   GoalContributionItem,
   GoalItem,
-  HoldingBasisItem,
   HoldingItem,
   NetWorthSnapshotItem,
   RecurringSeriesItem,
@@ -290,28 +289,6 @@ export function makeHoldingItem(
     lastSyncedAt: '2026-06-09T09:00:00.000Z',
     ...overrides,
   } as HoldingItem;
-}
-
-export function makeHoldingBasisItem(
-  accountId: string,
-  symbol: string,
-  costBasisMinor: number,
-  overrides: Partial<HoldingBasisItem> = {},
-): HoldingBasisItem {
-  return {
-    PK,
-    SK: `HOLDINGBASIS#${accountId}#${symbol}`,
-    entityType: 'HOLDING_BASIS',
-    schemaVersion: 1,
-    accountId,
-    symbol,
-    costBasisMinor,
-    currency: 'USD',
-    createdBy: SUB,
-    createdAt: '2026-06-09T09:00:00.000Z',
-    version: 1,
-    ...overrides,
-  } as HoldingBasisItem;
 }
 
 export function makeNetWorthItem(

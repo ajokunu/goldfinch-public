@@ -22,8 +22,7 @@ import {
   PutCommand,
   UpdateCommand,
 } from '@aws-sdk/lib-dynamodb';
-import { MAX_RANGE_DAYS, SCHEMA_VERSION } from '@goldfinch/shared/constants';
-import { prorateRangeTargetMinor } from '@goldfinch/shared/budgetMath';
+import { SCHEMA_VERSION } from '@goldfinch/shared/constants';
 import {
   KEY_PREFIX,
   budgetSk,
@@ -38,25 +37,16 @@ import type {
   BudgetItem,
   BudgetResponse,
   CategoryItem,
-  IsoDate,
-  ListBudgetsQuery,
   ListBudgetsResponse,
   MinorUnits,
 } from '@goldfinch/shared/types';
 import { getIdentity } from '../context.js';
 import { ddb, isConditionalCheckFailure, queryAll } from '../ddb.js';
-import { nowIso, rangeDays } from '../dates.js';
+import { nowIso } from '../dates.js';
 import { type ApiEnv, getEnv } from '../env.js';
 import { ApiError, json, noContent, parseJsonBody, requirePathParam } from '../http.js';
 import { budgetPeriod, toBudgetDto } from '../mapping.js';
-import {
-  optBool,
-  optBudgetPeriod,
-  optString,
-  reqInt,
-  reqString,
-  requireIsoDate,
-} from '../validate.js';
+import { optBool, optBudgetPeriod, optString, reqInt, reqString } from '../validate.js';
 
 interface Gsi2SpendRow {
   amountMinor: MinorUnits;
@@ -121,50 +111,6 @@ async function getCategory(
   return res.Item as CategoryItem | undefined;
 }
 
-/**
- * The optional `from`/`to` range for GET /budgets (budget-range feature,
- * Decision 3 — the additive range mode). Validation MIRRORS the transactions
- * route (`transactions.ts:113-125`): `requireIsoDate` on each param;
- * both-or-neither (exactly one present is a 400 VALIDATION_ERROR); `from > to`
- * is a 400 VALIDATION_ERROR; a span over MAX_RANGE_DAYS is a 400 RANGE_TOO_LARGE.
- * The `from > to` and span checks run on the SAME normalized `from`/`to` the
- * spend query and proration consume, so the window can never disagree with what
- * was validated. Absent => `undefined` (the per-cadence path is unchanged).
- */
-function parseRangeWindow(
-  event: APIGatewayProxyEventV2WithJWTAuthorizer,
-): PeriodWindow | undefined {
-  const qs = event.queryStringParameters ?? {};
-  // The wire contract for these params is the single shared ListBudgetsQuery the
-  // client (endpoints.ts, producer) also references, so the two sides cannot drift.
-  const query: ListBudgetsQuery = { from: qs['from'], to: qs['to'] };
-  const rawFrom = query.from;
-  const rawTo = query.to;
-  if (rawFrom === undefined && rawTo === undefined) {
-    return undefined;
-  }
-  if (rawFrom === undefined || rawTo === undefined) {
-    throw new ApiError(
-      400,
-      'VALIDATION_ERROR',
-      'from and to must both be provided',
-    );
-  }
-  const from = requireIsoDate(rawFrom, 'from') as IsoDate;
-  const to = requireIsoDate(rawTo, 'to') as IsoDate;
-  if (from > to) {
-    throw new ApiError(400, 'VALIDATION_ERROR', 'from must not be after to');
-  }
-  if (rangeDays(from, to) > MAX_RANGE_DAYS) {
-    throw new ApiError(
-      400,
-      'RANGE_TOO_LARGE',
-      `date range must not exceed ${MAX_RANGE_DAYS} days`,
-    );
-  }
-  return { from, to };
-}
-
 export async function listBudgets(
   event: APIGatewayProxyEventV2WithJWTAuthorizer,
 ): Promise<APIGatewayProxyStructuredResultV2> {
@@ -173,10 +119,6 @@ export async function listBudgets(
   // One `now` for the whole response so every budget's window is computed
   // against the same instant (a budget can't straddle a second boundary).
   const now = new Date();
-  // Budget-range feature: BOTH absent => per-cadence path unchanged; BOTH present
-  // => every budget is windowed to this one [from, to] and limitMinor carries the
-  // prorated target (Decision 3).
-  const range = parseRangeWindow(event);
 
   const [budgets, categoryNames] = await Promise.all([
     queryAll<BudgetItem>({
@@ -190,11 +132,10 @@ export async function listBudgets(
     loadCategoryNames(env, household),
   ]);
 
-  // Range mode: every budget shares the supplied [from, to] window for the spend
-  // query. Default mode: each budget is summed over ITS OWN period window (P11-3)
-  // — weekly over this calendar week, monthly over this month, yearly over the year.
+  // Each budget is summed over ITS OWN period window (P11-3): weekly budgets
+  // over this calendar week, monthly over this month, yearly over this year.
   const windows = budgets.map((budget) =>
-    range ?? periodWindow(budgetPeriod(budget), now, env.defaultTz),
+    periodWindow(budgetPeriod(budget), now, env.defaultTz),
   );
   const spends = await Promise.all(
     budgets.map((budget, i) =>
@@ -207,11 +148,6 @@ export async function listBudgets(
       spends[i] as MinorUnits,
       windows[i] as PeriodWindow,
       categoryNames.get(budget.categoryId),
-      // Range mode replaces the per-period cap with the prorated target over
-      // [from, to] (the single source — the client never re-derives it).
-      range
-        ? prorateRangeTargetMinor(budget.limitMinor, budgetPeriod(budget), range.from, range.to)
-        : undefined,
     ),
   );
   const body: ListBudgetsResponse = { items };
@@ -365,9 +301,9 @@ export async function updateBudget(
 }
 
 /**
- * DELETE /budgets/{categoryId} -> 204. NOTE: requires dynamodb:DeleteItem on the
- * table, which the current infra IAM grant (Query/GetItem/PutItem/UpdateItem)
- * does not include — flagged for the infra owner since the route is registered.
+ * DELETE /budgets/{categoryId} -> 204. Backed by dynamodb:DeleteItem on the
+ * table (the GoldFinchTableAccess grant in infra/lib/api-stack.ts; covered by
+ * the route<->IAM parity test).
  */
 export async function deleteBudget(
   event: APIGatewayProxyEventV2WithJWTAuthorizer,

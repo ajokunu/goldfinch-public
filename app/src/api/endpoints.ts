@@ -29,13 +29,10 @@ import type {
   GetAttachmentDownloadResponse,
   GoalResponse,
   HealthResponse,
-  HoldingPriceHistoryQuery,
-  HoldingPriceHistoryResponse,
   ImportTransactionsRequest,
   ImportTransactionsResponse,
   ListAccountsResponse,
   ListAttachmentsResponse,
-  ListBudgetsQuery,
   ListBudgetsResponse,
   ListCategoriesResponse,
   ListGoalsResponse,
@@ -47,7 +44,6 @@ import type {
   NetWorthHistoryResponse,
   PatchAccountRequest,
   PatchAccountResponse,
-  SetHoldingCostBasisRequest,
   PatchBudgetRequest,
   PatchCategoryRequest,
   PatchGoalRequest,
@@ -146,19 +142,8 @@ export function patchTransactionCategory(
 // Budgets
 // ---------------------------------------------------------------------------
 
-/**
- * GET /budgets (budget-range feature, Decision 3). With no query: every budget
- * is windowed by its own cadence and `limitMinor` is the stored one-period cap.
- * With both `from`/`to` (inclusive yyyy-mm-dd): every budget is windowed to that
- * range and `limitMinor` carries the server-prorated range target. The shared
- * `ListBudgetsQuery` is the single definition both this producer and the route
- * (`services/api/src/routes/budgets.ts`, consumer) reference.
- */
-export function listBudgets(
-  query: ListBudgetsQuery = {},
-  signal?: AbortSignal,
-): Promise<ListBudgetsResponse> {
-  return apiFetch<ListBudgetsResponse>('/budgets', { query: { ...query }, signal });
+export function listBudgets(signal?: AbortSignal): Promise<ListBudgetsResponse> {
+  return apiFetch<ListBudgetsResponse>('/budgets', { signal });
 }
 
 export function createBudget(body: CreateBudgetRequest): Promise<BudgetResponse> {
@@ -293,45 +278,6 @@ export function listAccountHoldings(
   return apiFetch<ListHoldingsResponse>(
     `/accounts/${encodeURIComponent(accountId)}/holdings`,
     { signal },
-  );
-}
-
-/**
- * POST /accounts/{accountId}/holdings/{symbol}/cost-basis
- * (API_ROUTES.setHoldingCostBasis): sets or clears the USER-OWNED manual TOTAL
- * cost basis for a position. `amount` is the decimal string the user typed
- * (parsed server-side against the holding's currency); `null` clears the basis
- * (deletes the HOLDING_BASIS item). The response is the full refreshed holdings
- * list with gain/percentReturn re-derived through the shared helper.
- */
-export function setHoldingCostBasis(
-  accountId: string,
-  symbol: string,
-  body: SetHoldingCostBasisRequest,
-): Promise<ListHoldingsResponse> {
-  return apiFetch<ListHoldingsResponse>(
-    `/accounts/${encodeURIComponent(accountId)}/holdings/${encodeURIComponent(symbol)}/cost-basis`,
-    { method: 'POST', body },
-  );
-}
-
-/**
- * GET /accounts/{accountId}/holdings/{symbol}/price-history?from&to
- * (API_ROUTES.holdingPriceHistory): the daily price-per-share snapshot series
- * for one position, plus `firstSnapshotDate` (null before the first snapshot).
- * The server stays a dumb history (like /networth/history) -- the client
- * NORMALIZES `items` to a % return series via the shared holdingReturn helper.
- * Defaults: `to` = today, `from` = earliest snapshot (both inclusive yyyy-mm-dd).
- */
-export function holdingPriceHistory(
-  accountId: string,
-  symbol: string,
-  query: HoldingPriceHistoryQuery = {},
-  signal?: AbortSignal,
-): Promise<HoldingPriceHistoryResponse> {
-  return apiFetch<HoldingPriceHistoryResponse>(
-    `/accounts/${encodeURIComponent(accountId)}/holdings/${encodeURIComponent(symbol)}/price-history`,
-    { query: { ...query }, signal },
   );
 }
 

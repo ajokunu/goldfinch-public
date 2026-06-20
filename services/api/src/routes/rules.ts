@@ -38,11 +38,7 @@ import {
   userPk,
 } from '@goldfinch/shared/keys';
 import { parseDecimalString } from '@goldfinch/shared/money';
-import {
-  compareRulePrecedence,
-  ruleMarksTransfer,
-  ruleMatches,
-} from '@goldfinch/shared/rules';
+import { compareRulePrecedence, ruleMatches } from '@goldfinch/shared/rules';
 import type {
   ApplyRuleResponse,
   CategoryItem,
@@ -187,7 +183,6 @@ export async function createRule(
   assertBoundOrder(amountMinMinor, amountMaxMinor);
   const priority = optInt(body, 'priority') ?? DEFAULT_RULE_PRIORITY;
   const enabled = optBool(body, 'enabled') ?? true;
-  const markTransfer = optBool(body, 'markTransfer');
 
   const ruleId = randomUUID();
   const item: RuleItem = {
@@ -203,8 +198,6 @@ export async function createRule(
     categoryId,
     priority,
     enabled,
-    // Only SET when provided; absent stays absent (read as false), back-compat.
-    ...(markTransfer !== undefined ? { markTransfer } : {}),
     version: 1,
     createdBy: sub,
     createdAt: nowIso(),
@@ -305,12 +298,6 @@ export async function patchRule(
     names['#enabled'] = 'enabled';
     values[':enabled'] = enabled;
     sets.push('#enabled = :enabled');
-  }
-  const markTransfer = optBool(body, 'markTransfer');
-  if (markTransfer !== undefined) {
-    names['#markTransfer'] = 'markTransfer';
-    values[':markTransfer'] = markTransfer;
-    sets.push('#markTransfer = :markTransfer');
   }
 
   try {
@@ -442,22 +429,15 @@ export async function applyRule(
     return ruleMatches(rule, { payeeLower, amountMinor: row.amountMinor });
   });
 
-  // A markTransfer rule makes the row a transfer (durable mechanism): the same
-  // value feeds computeGsi2Keys (-> null -> the REMOVE GSI2 branch) AND the
-  // SET #isTransfer below, so both transfer signals are written in one update.
-  const marksTransfer = ruleMarksTransfer(rule);
-
   let updatedCount = 0;
   const now = nowIso();
   for (const row of matches) {
     const { date, txnId } = parseTxnSk(row.SK);
-    // Effective transfer status: the rule's action OR a pre-existing flag.
-    const effectiveIsTransfer = marksTransfer || row.isTransfer === true;
     const gsi2Keys = computeGsi2Keys({
       household,
       categoryId: rule.categoryId,
       categoryType: category.type,
-      isTransfer: effectiveIsTransfer,
+      isTransfer: row.isTransfer === true,
       date,
       txnId,
     });
@@ -486,12 +466,6 @@ export async function applyRule(
       '#updatedAt = :now',
       '#version = if_not_exists(#version, :zero) + :one',
     ];
-    if (marksTransfer) {
-      // Durable per-row transfer signal honored by the client donut + GSI2.
-      names['#isTransfer'] = 'isTransfer';
-      values[':true'] = true;
-      sets.push('#isTransfer = :true');
-    }
     let updateExpression: string;
     if (gsi2Keys !== null) {
       values[':gsi2pk'] = gsi2Keys.GSI2PK;

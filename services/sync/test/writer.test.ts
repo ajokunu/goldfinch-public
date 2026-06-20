@@ -91,12 +91,7 @@ describe('buildAccountFieldUpdate (P8-4)', () => {
   });
 
   it('locks the user-owned account field list to the P8-4 contract', () => {
-    expect([...ACCOUNT_USER_OWNED_FIELDS]).toEqual([
-      'typeOverride',
-      'isLiabilityOverride',
-      'nameOverride',
-      'institutionOverride',
-    ]);
+    expect([...ACCOUNT_USER_OWNED_FIELDS]).toEqual(['typeOverride', 'isLiabilityOverride']);
   });
 
   it('REMOVEs removable optional fields the institution stopped sending, never holdingsSupported', () => {
@@ -182,32 +177,6 @@ describe('upsertSyncItems', () => {
     expect(row?.balanceMinor).toBe(150000);
     expect(row?.balanceRaw).toBe('1500.00');
     expect(row?.accountType).toBe('other'); // synced type still sync-owned
-  });
-
-  it('preserves nameOverride/institutionOverride through a sync refresh (overrides are user-owned)', async () => {
-    const ddb = new FakeDdb();
-    await upsertSyncItems(normalizeForSync(baseAccountSet(), CTX), options(ddb));
-
-    // Simulate PATCH /accounts/{accountId}: the user relabels checking.
-    ddb.putItem({
-      ...ddb.getItem(PK, 'ACCT#ACT-checking-1'),
-      nameOverride: 'Joint Checking',
-      institutionOverride: 'My Bank',
-    });
-
-    // Next sync run arrives with the institution renaming the account.
-    const refreshed = baseAccountSet();
-    refreshed.accounts[0]!.name = 'Premium Checking';
-    refreshed.accounts[0]!.org.name = 'Example Bank, N.A.';
-    await upsertSyncItems(normalizeForSync(refreshed, CTX), options(ddb));
-
-    const row = ddb.getItem(PK, 'ACCT#ACT-checking-1');
-    // User-owned overrides survive untouched...
-    expect(row?.nameOverride).toBe('Joint Checking');
-    expect(row?.institutionOverride).toBe('My Bank');
-    // ...while the synced name/institution refresh underneath.
-    expect(row?.name).toBe('Premium Checking');
-    expect(row?.institution).toBe('Example Bank, N.A.');
   });
 
   it('preserves account overrides even when the PATCH lands mid-run', async () => {

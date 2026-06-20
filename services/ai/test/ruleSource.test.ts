@@ -75,21 +75,8 @@ describe('convertRuleRecords entityType discrimination', () => {
         categoryId: 'coffee',
         priority: 5,
         enabled: true,
-        markTransfer: false,
       },
     ]);
-  });
-
-  it('carries markTransfer=true so the daily-sync apply path can honor the transfer action', () => {
-    const { specs } = convertRuleRecords([
-      sharedRule({ ruleId: 'xfer', categoryId: 'transfers', markTransfer: true }),
-    ]);
-    assert.equal(specs[0]!.markTransfer, true);
-  });
-
-  it('defaults absent markTransfer to false (back-compat with pre-transfer-rule writers)', () => {
-    const { specs } = convertRuleRecords([sharedRule({ ruleId: 'r1' })]);
-    assert.equal(specs[0]!.markTransfer, false);
   });
 
   it('preserves enabled=false so disabled rules stay disabled', () => {

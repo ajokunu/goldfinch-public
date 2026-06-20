@@ -91,10 +91,6 @@ function fromSharedRule(record: RuleItem): RuleSpec | null {
     priority: record.priority,
     // The matcher treats undefined as enabled; pass through explicitly.
     enabled: record.enabled !== false,
-    // Carry the transfer-marking ACTION so the daily-sync apply path can honor
-    // it (parity with the API apply-now route). Absent == false; legacy rules
-    // never set it, so fromLegacyRule deliberately omits it.
-    markTransfer: record.markTransfer === true,
   };
 }
 

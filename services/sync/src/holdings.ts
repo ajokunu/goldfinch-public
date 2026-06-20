@@ -146,9 +146,8 @@ function parseHolding(
     item.symbol = symbol;
   }
   if (typeof wire.cost_basis === 'string') {
-    let parsedCostBasis: number;
     try {
-      parsedCostBasis = parseCurrencyAmount(wire.cost_basis, currency);
+      item.costBasisMinor = parseCurrencyAmount(wire.cost_basis, currency);
     } catch {
       // Strict by design: a present-but-unparseable money field means the
       // entry is suspect, so the whole position is skipped (and logged by the
@@ -157,38 +156,6 @@ function parseHolding(
         ok: false,
         reason: `holding cost_basis is not parseable money: "${wire.cost_basis}"`,
       };
-    }
-    // The bridge reports cost_basis "0" for accounts that don't actually track
-    // it (employer 401k/403b plans, HSAs, many IRAs). A position WITH market
-    // value but a zero basis is "unknown", not a real zero-cost lot — leaving
-    // costBasisMinor unset makes every reader (HoldingsTable, the Investments
-    // aggregate) render "—" via its costBasisComplete/undefined checks instead
-    // of a misleading $0.00. A genuine zero-cost lot is vanishingly rare here
-    // and not worth showing a false 100%-gain for.
-    if (parsedCostBasis !== 0) {
-      item.costBasisMinor = parsedCostBasis;
-    }
-  }
-  if (typeof wire.purchase_price === 'string') {
-    let parsedPurchasePrice: number;
-    try {
-      parsedPurchasePrice = parseCurrencyAmount(wire.purchase_price, currency);
-    } catch {
-      // Strict by design, mirroring cost_basis: a present-but-unparseable money
-      // field means the entry is suspect, so the whole position is skipped (and
-      // logged by the caller) rather than persisted half-correct.
-      return {
-        ok: false,
-        reason: `holding purchase_price is not parseable money: "${wire.purchase_price}"`,
-      };
-    }
-    // Same zero-guard as cost_basis: the bridge reports purchase_price "0" for
-    // accounts that don't track it (the household's tax-advantaged plans), so a
-    // 0 is "unavailable", not a real zero-cost lot — leaving purchasePriceMinor
-    // unset keeps it from masquerading as a feed cost source. It is an additive
-    // fallback only; it never blocks the manual basis path.
-    if (parsedPurchasePrice !== 0) {
-      item.purchasePriceMinor = parsedPurchasePrice;
     }
   }
   return { ok: true, item };

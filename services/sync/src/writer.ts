@@ -20,10 +20,9 @@
  *
  *   - ACCOUNTS get the same treatment (P8-4): ACCT# items are written with an
  *     attribute-scoped UpdateCommand that SETs only sync-owned attributes, so
- *     the USER-OWNED override fields (typeOverride, isLiabilityOverride,
- *     nameOverride, institutionOverride - set only by PATCH /accounts) and the
- *     creation-owned `source` flag are untouchable BY CONSTRUCTION. UpdateItem
- *     creates the item when absent
+ *     the USER-OWNED override fields (typeOverride, isLiabilityOverride - set
+ *     only by PATCH /accounts) and the creation-owned `source` flag are
+ *     untouchable BY CONSTRUCTION. UpdateItem creates the item when absent
  *     (a brand-new account has no user-owned attributes to lose), so one code
  *     path covers create and refresh with no existence read. There is no
  *     account analogue of the moved-row merge path: ACCT#<id> keys never
@@ -196,8 +195,6 @@ const BANK_OWNED_OPTIONAL = [
 export const ACCOUNT_USER_OWNED_FIELDS = [
   'typeOverride',
   'isLiabilityOverride',
-  'nameOverride',
-  'institutionOverride',
 ] as const satisfies readonly (keyof AccountItem)[];
 
 /**
@@ -456,9 +453,8 @@ export function buildAccountFieldUpdate(fresh: SyncAccountItem): BankFieldUpdate
  * Create-or-refresh one ACCT# item via the attribute-scoped update (P8-4).
  * UpdateItem creates the item when absent - a brand-new account is exactly
  * its sync-owned attributes - and on an existing item touches ONLY the
- * sync-owned attributes, leaving typeOverride / isLiabilityOverride /
- * nameOverride / institutionOverride / source untouched by construction. A
- * failure here propagates and fails the run
+ * sync-owned attributes, leaving typeOverride / isLiabilityOverride / source
+ * untouched by construction. A failure here propagates and fails the run
  * (idempotent; the next scheduled run repairs).
  */
 async function upsertAccount(

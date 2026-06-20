@@ -41,13 +41,12 @@ import {
   useHover,
 } from '../../../src/ui/useHover';
 import { useReducedMotion } from '../../../src/ui/useReducedMotion';
-import { useCategoriesQuery } from '../../budget/hooks/useBudgetQueries';
 import { CurrencyHeading } from '../../reports/components/CurrencyHeading';
 import { useReportsFlow } from '../../reports/hooks';
 import { flowGroupHasContent, flowIsEmpty } from '../../reports/lib/series';
 import { DEFAULT_PERIOD_SCOPE, useWindowTransactions, type PeriodScope } from '../hooks';
 import { isoMonthName, monthSpendingTitle } from '../lib/labels';
-import { windowFlowByCurrency } from '../lib/spend';
+import { windowExpenseByCurrency } from '../lib/spend';
 import { Card, CardHeader } from './Card';
 import { CardSkeleton } from './Skeleton';
 import { ErrorState } from './States';
@@ -225,70 +224,9 @@ function BudgetLink() {
 }
 
 /**
- * Shared donut body for both the month and week spending cards: an empty tile
- * when there is nothing to draw, otherwise one GroupDonut per currency with
- * content (the per-currency heading appears only above two or more currencies,
- * P7-7). Both scopes render through this one path so they can never visually
- * drift; the week scope reuses the same FlowCurrencyGroupDto shape via
- * windowFlowByCurrency.
- */
-function SpendingDonuts({
-  groups,
-  title,
-  spentLabel,
-  emptyMessage,
-}: {
-  groups: FlowCurrencyGroupDto[];
-  title: string;
-  spentLabel: string;
-  emptyMessage: string;
-}) {
-  const theme = useTheme();
-  if (groups.length === 0) {
-    return (
-      <View style={styles.empty}>
-        <View
-          style={[
-            styles.emptyTile,
-            {
-              backgroundColor: theme.colors.surfaceAlt,
-              borderRadius: theme.radius.token,
-            },
-          ]}
-        >
-          <ChartPie size={22} color={theme.colors.dim} strokeWidth={2} />
-        </View>
-        <Text
-          style={{
-            color: theme.colors.dim,
-            fontSize: 12.5,
-            fontFamily: theme.fonts.sans,
-            textAlign: 'center',
-            marginTop: 8,
-          }}
-        >
-          {emptyMessage}
-        </Text>
-      </View>
-    );
-  }
-  return (
-    <View style={{ gap: theme.spacing.md }}>
-      {groups.map((group) => (
-        <View key={group.currency} style={{ gap: theme.spacing.xs }}>
-          {groups.length > 1 ? <CurrencyHeading currency={group.currency} /> : null}
-          <GroupDonut group={group} title={title} spentLabel={spentLabel} />
-        </View>
-      ))}
-    </View>
-  );
-}
-
-/**
  * Dashboard spending card (screens.md 1.4), scope-aware per P11-5. This Month
  * is the server-aggregated `/reports/flow` donut (unchanged default); This
- * Week renders the SAME donut/legend, aggregated client-side from the
- * periodWindow('weekly') transactions slice (no weekly flow route exists).
+ * Week is the periodWindow-derived spend figure (no weekly flow route exists).
  */
 export function SpendingCard({
   scope = DEFAULT_PERIOD_SCOPE,
@@ -299,6 +237,7 @@ export function SpendingCard({
 }
 
 function MonthSpendingCard() {
+  const theme = useTheme();
   const t = useT();
   const lang = useLang();
   // Pinned per mount, like the recent-transactions window; a focus refetch
@@ -330,34 +269,68 @@ function MonthSpendingCard() {
     );
   }
 
-  const groups = flowIsEmpty(flowQuery.data)
-    ? []
-    : (flowQuery.data.perCurrency ?? []).filter(flowGroupHasContent);
+  const groups = (flowQuery.data.perCurrency ?? []).filter(flowGroupHasContent);
+  const empty = flowIsEmpty(flowQuery.data);
 
   return (
     <Card>
       <CardHeader title={title} right={<BudgetLink />} />
-      <SpendingDonuts
-        groups={groups}
-        title={title}
-        spentLabel={t('Spent')}
-        emptyMessage={`No spending yet in ${monthName}. Transactions appear after your next sync.`}
-      />
+      {empty ? (
+        <View style={styles.empty}>
+          <View
+            style={[
+              styles.emptyTile,
+              {
+                backgroundColor: theme.colors.surfaceAlt,
+                borderRadius: theme.radius.token,
+              },
+            ]}
+          >
+            <ChartPie size={22} color={theme.colors.dim} strokeWidth={2} />
+          </View>
+          <Text
+            style={{
+              color: theme.colors.dim,
+              fontSize: 12.5,
+              fontFamily: theme.fonts.sans,
+              textAlign: 'center',
+              marginTop: 8,
+            }}
+          >
+            {`No spending yet in ${monthName}. Transactions appear after your next sync.`}
+          </Text>
+        </View>
+      ) : (
+        <View style={{ gap: theme.spacing.md }}>
+          {groups.map((group) => (
+            <View key={group.currency} style={{ gap: theme.spacing.xs }}>
+              {groups.length > 1 ? (
+                <CurrencyHeading currency={group.currency} />
+              ) : null}
+              <GroupDonut
+                group={group}
+                title={title}
+                spentLabel={t('Spent')}
+              />
+            </View>
+          ))}
+        </View>
+      )}
     </Card>
   );
 }
 
 /**
- * This Week spending card (P11-5): renders the SAME donut/legend as the month
- * card, aggregated client-side from the periodWindow('weekly') transactions
- * slice (no weekly flow route exists). Category display names come from the
- * categories query because TransactionDto carries only the id; both queries
- * must resolve before the donut draws so the legend names are correct.
+ * This Week spending figure (P11-5): the periodWindow('weekly')-scoped expense
+ * total per currency, derived client-side because there is no weekly flow
+ * route. No donut/legend (the flow category breakdown is monthly only); just
+ * the headline spent figure(s) with the same Budget link.
  */
 function WeekSpendingCard() {
+  const theme = useTheme();
   const t = useT();
+  const { mask } = useMaskMoney();
   const txnQuery = useWindowTransactions('weekly');
-  const categoriesQuery = useCategoriesQuery();
 
   useEffect(() => {
     if (txnQuery.isError) {
@@ -368,68 +341,93 @@ function WeekSpendingCard() {
     }
   }, [txnQuery.isError, txnQuery.error]);
 
-  // Names live in a small, app-wide-cached query; build the id -> name lookup
-  // once both reads land. An archived/missing id falls back to its slug.
-  const categoryNameFor = useMemo(() => {
-    const byId = new Map(
-      (categoriesQuery.data?.items ?? []).map((category) => [
-        category.categoryId,
-        category.name,
-      ]),
-    );
-    return (categoryId: string) => byId.get(categoryId);
-  }, [categoriesQuery.data]);
-
-  // Type lookup from the SAME query: lets windowFlowByCurrency exclude
-  // TRANSFER-categorized expenses exactly as the server donut does (so a
-  // credit-card payoff filed under a TRANSFER category never leaks into spend).
-  const categoryTypeFor = useMemo(() => {
-    const byId = new Map(
-      (categoriesQuery.data?.items ?? []).map((category) => [
-        category.categoryId,
-        category.type,
-      ]),
-    );
-    return (categoryId: string) => byId.get(categoryId);
-  }, [categoriesQuery.data]);
-
-  // Gate on BOTH: the donut needs the window's transactions and the names.
-  if (txnQuery.isPending || categoriesQuery.isPending) {
-    return <CardSkeleton rows={3} />;
+  if (txnQuery.isPending) {
+    return <CardSkeleton rows={2} />;
   }
-  if (txnQuery.isError || categoriesQuery.isError) {
+  if (txnQuery.isError) {
     return (
       <ErrorState
         title="Could not load spending"
-        onRetry={() => {
-          if (txnQuery.isError) void txnQuery.refetch();
-          if (categoriesQuery.isError) void categoriesQuery.refetch();
-        }}
+        onRetry={() => void txnQuery.refetch()}
       />
     );
   }
 
-  const groups = windowFlowByCurrency(
-    txnQuery.data.items,
-    categoryNameFor,
-    categoryTypeFor,
-  ).filter(flowGroupHasContent);
+  const spends = windowExpenseByCurrency(txnQuery.data.items);
+  const empty = spends.length === 0;
 
   return (
     <Card>
       <CardHeader title={t('This week')} right={<BudgetLink />} />
-      <SpendingDonuts
-        groups={groups}
-        title={t('This week')}
-        spentLabel={t('Spent')}
-        emptyMessage="No spending yet this week. Transactions appear after your next sync."
-      />
+      {empty ? (
+        <View style={styles.empty}>
+          <View
+            style={[
+              styles.emptyTile,
+              {
+                backgroundColor: theme.colors.surfaceAlt,
+                borderRadius: theme.radius.token,
+              },
+            ]}
+          >
+            <ChartPie size={22} color={theme.colors.dim} strokeWidth={2} />
+          </View>
+          <Text
+            style={{
+              color: theme.colors.dim,
+              fontSize: 12.5,
+              fontFamily: theme.fonts.sans,
+              textAlign: 'center',
+              marginTop: 8,
+            }}
+          >
+            No spending yet this week. Transactions appear after your next sync.
+          </Text>
+        </View>
+      ) : (
+        <View style={{ gap: theme.spacing.sm }}>
+          {spends.map((spend) => (
+            <View key={spend.currency} style={styles.weekRow}>
+              {spends.length > 1 ? (
+                <CurrencyHeading currency={spend.currency} />
+              ) : (
+                <Text
+                  style={{
+                    color: theme.colors.dim,
+                    fontSize: 12.5,
+                    fontFamily: theme.fonts.sans,
+                  }}
+                >
+                  {t('Spent')}
+                </Text>
+              )}
+              <Text
+                accessibilityLabel={`${t('Spent')}: ${mask(formatMinorAmount(spend.expenseMinor, spend.currency))}`}
+                style={{
+                  color: theme.colors.text,
+                  fontSize: 22,
+                  fontFamily: theme.fonts.mono,
+                  fontWeight: '600',
+                }}
+              >
+                {mask(formatMinorAmount(spend.expenseMinor, spend.currency))}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
   ghostLink: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  weekRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
   bodyRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   legend: { flex: 1, gap: 8 },
   legendRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
