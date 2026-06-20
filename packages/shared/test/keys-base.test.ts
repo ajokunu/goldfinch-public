@@ -54,6 +54,8 @@ describe('constants', () => {
       goal: 'GOAL#',
       contribution: 'CONTRIB#',
       holding: 'HOLDING#',
+      holdingBasis: 'HOLDINGBASIS#',
+      holdingPrice: 'HOLDINGPRICE#',
       netWorth: 'NETWORTH#',
       rule: 'RULE#',
       importTxnPointer: 'TXNPTR#import:',

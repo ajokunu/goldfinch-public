@@ -43,12 +43,12 @@ beforeEach(() => {
 
 describe('GET /profile', () => {
   it('returns the stored display name from the CALLER-keyed PROFILE item', async () => {
-    ddbMock.on(GetCommand).resolves({ Item: makeProfileItem(SUB, { displayName: 'Dami' }) });
+    ddbMock.on(GetCommand).resolves({ Item: makeProfileItem(SUB, { displayName: 'Taylor' }) });
 
     const res = await handler(makeEvent({ routeKey: 'GET /profile' }));
 
     expect(res.statusCode).toBe(200);
-    expect(parseBody<GetProfileResponse>(res)).toEqual({ displayName: 'Dami' });
+    expect(parseBody<GetProfileResponse>(res)).toEqual({ displayName: 'Taylor' });
     // The sub comes from the JWT claims, never from client input.
     const get = ddbMock.commandCalls(GetCommand)[0]!.args[0].input;
     expect(get.Key).toEqual(PROFILE_KEY);
@@ -71,7 +71,7 @@ describe('GET /profile', () => {
 
     expect(res.statusCode).toBe(200);
     expect(parseBody<GetProfileResponse>(res)).toEqual({
-      displayName: 'Aaron',
+      displayName: 'Alex',
       email: 'wpffkejd@example.com',
     });
   });
@@ -114,10 +114,10 @@ describe('PATCH /profile', () => {
     ddbMock.on(GetCommand).resolves({ Item: undefined });
     ddbMock.on(PutCommand).resolves({});
 
-    const res = await handler(patchEvent({ displayName: '  Dami  ' }));
+    const res = await handler(patchEvent({ displayName: '  Taylor  ' }));
 
     expect(res.statusCode).toBe(200);
-    expect(parseBody<PatchProfileResponse>(res)).toEqual({ displayName: 'Dami' });
+    expect(parseBody<PatchProfileResponse>(res)).toEqual({ displayName: 'Taylor' });
     const put = ddbMock.commandCalls(PutCommand)[0]!.args[0].input;
     expect(put.ConditionExpression).toBe('attribute_not_exists(SK)');
     expect(put.Item).toMatchObject({
@@ -125,7 +125,7 @@ describe('PATCH /profile', () => {
       entityType: 'USER',
       cognitoSub: SUB,
       householdId: HOUSEHOLD,
-      displayName: 'Dami',
+      displayName: 'Taylor',
       version: 1,
     });
   });
@@ -133,15 +133,15 @@ describe('PATCH /profile', () => {
   it('updates an existing profile conditionally on the version it read', async () => {
     ddbMock
       .on(GetCommand)
-      .resolves({ Item: makeProfileItem(SUB, { displayName: 'Aaron', version: 3 }) });
+      .resolves({ Item: makeProfileItem(SUB, { displayName: 'Alex', version: 3 }) });
     ddbMock
       .on(UpdateCommand)
-      .resolves({ Attributes: makeProfileItem(SUB, { displayName: 'Dami', version: 4 }) });
+      .resolves({ Attributes: makeProfileItem(SUB, { displayName: 'Taylor', version: 4 }) });
 
-    const res = await handler(patchEvent({ displayName: 'Dami' }));
+    const res = await handler(patchEvent({ displayName: 'Taylor' }));
 
     expect(res.statusCode).toBe(200);
-    expect(parseBody<PatchProfileResponse>(res)).toEqual({ displayName: 'Dami' });
+    expect(parseBody<PatchProfileResponse>(res)).toEqual({ displayName: 'Taylor' });
     const update = ddbMock.commandCalls(UpdateCommand)[0]!.args[0].input;
     expect(update.Key).toEqual(PROFILE_KEY);
     expect(update.ConditionExpression).toBe(
@@ -150,7 +150,7 @@ describe('PATCH /profile', () => {
     expect(update.ExpressionAttributeValues).toMatchObject({
       ':version': 3,
       ':nextVersion': 4,
-      ':displayName': 'Dami',
+      ':displayName': 'Taylor',
     });
     // Only displayName/updatedAt/version are touched — notification
     // preferences and other profile attributes survive the write.
@@ -160,14 +160,14 @@ describe('PATCH /profile', () => {
   });
 
   it('handles pre-feature items without a version (conditions on its absence)', async () => {
-    const legacy = makeProfileItem(SUB, { displayName: 'Aaron' });
+    const legacy = makeProfileItem(SUB, { displayName: 'Alex' });
     delete (legacy as Partial<typeof legacy>).version;
     ddbMock.on(GetCommand).resolves({ Item: legacy });
     ddbMock
       .on(UpdateCommand)
-      .resolves({ Attributes: makeProfileItem(SUB, { displayName: 'Dami', version: 1 }) });
+      .resolves({ Attributes: makeProfileItem(SUB, { displayName: 'Taylor', version: 1 }) });
 
-    const res = await handler(patchEvent({ displayName: 'Dami' }));
+    const res = await handler(patchEvent({ displayName: 'Taylor' }));
 
     expect(res.statusCode).toBe(200);
     const update = ddbMock.commandCalls(UpdateCommand)[0]!.args[0].input;
@@ -182,7 +182,7 @@ describe('PATCH /profile', () => {
     ddbMock.on(GetCommand).resolves({ Item: makeProfileItem(SUB, { version: 3 }) });
     ddbMock.on(UpdateCommand).rejects(conditionFailure(true));
 
-    const res = await handler(patchEvent({ displayName: 'Dami' }));
+    const res = await handler(patchEvent({ displayName: 'Taylor' }));
 
     expect(res.statusCode).toBe(409);
     expect(parseBody<ErrorEnvelope>(res).error.code).toBe('VERSION_CONFLICT');
@@ -192,7 +192,7 @@ describe('PATCH /profile', () => {
     ddbMock.on(GetCommand).resolves({ Item: undefined });
     ddbMock.on(PutCommand).rejects(conditionFailure(true));
 
-    const res = await handler(patchEvent({ displayName: 'Dami' }));
+    const res = await handler(patchEvent({ displayName: 'Taylor' }));
 
     expect(res.statusCode).toBe(409);
     expect(parseBody<ErrorEnvelope>(res).error.code).toBe('VERSION_CONFLICT');
@@ -228,7 +228,7 @@ describe('PATCH /profile', () => {
     const res = await handler(
       makeEvent({
         routeKey: 'PATCH /profile',
-        body: { displayName: 'Dami' },
+        body: { displayName: 'Taylor' },
         claims: { sub: SUB },
       }),
     );

@@ -23,9 +23,9 @@ const MAX = PROFILE_DISPLAY_NAME_MAX_LENGTH; // 40
 
 describe('normalizeDisplayName', () => {
   it('trims both ends and inner is preserved', () => {
-    assert.equal(normalizeDisplayName('  Dami  '), 'Dami');
+    assert.equal(normalizeDisplayName('  Taylor  '), 'Taylor');
     assert.equal(normalizeDisplayName('Da mi'), 'Da mi');
-    assert.equal(normalizeDisplayName('\t\nDami\n'), 'Dami');
+    assert.equal(normalizeDisplayName('\t\nTaylor\n'), 'Taylor');
   });
 });
 
@@ -58,9 +58,9 @@ describe('isValidDisplayName boundaries', () => {
 
 describe('validateDisplayName', () => {
   it('returns the trimmed value when valid', () => {
-    assert.deepEqual(validateDisplayName('  Dami  '), {
+    assert.deepEqual(validateDisplayName('  Taylor  '), {
       ok: true,
-      value: 'Dami',
+      value: 'Taylor',
     });
   });
   it('reports too-short for empty', () => {

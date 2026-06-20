@@ -206,6 +206,172 @@ describe('GET /budgets — per-period spend window (P11-3)', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Budget-range feature (Decision 3): GET /budgets?from=&to= windows every budget
+// to the supplied [from, to] for the spend query and replaces limitMinor with the
+// prorated target. Absent params keep the byte-for-byte per-cadence behavior. The
+// DDB mock cannot range-filter, so the proof that the route narrowed to the range
+// is the GSI2 query's date BETWEEN bounds plus the DTO periodFrom/To.
+// ---------------------------------------------------------------------------
+
+/**
+ * Mock a single monthly budget (`limitMinor`) plus its spend rows, run
+ * GET /budgets with the given query, and return the parsed DTO plus the GSI2
+ * query's date-range bounds.
+ */
+async function getRangeBudget(
+  limitMinor: number,
+  query: Record<string, string> | undefined,
+  spendRows: Array<{ amountMinor: number }>,
+): Promise<{
+  res: Awaited<ReturnType<typeof handler>>;
+  budget?: ListBudgetsResponse['items'][number];
+  bounds?: { start: string; end: string };
+}> {
+  ddbMock.on(QueryCommand).callsFake((input: Record<string, unknown>) => {
+    if (input['IndexName'] === 'GSI2') {
+      return { Items: spendRows };
+    }
+    const values = input['ExpressionAttributeValues'] as Record<string, unknown>;
+    if (values[':prefix'] === 'BUDGET#') {
+      return { Items: [makeBudgetItem('groceries', limitMinor)] };
+    }
+    if (values[':prefix'] === 'CATEGORY#') {
+      return { Items: [makeCategoryItem('groceries', 'EXPENSE', { name: 'Groceries' })] };
+    }
+    return { Items: [] };
+  });
+
+  const res = await handler(makeEvent({ routeKey: 'GET /budgets', query }));
+  if (res.statusCode !== 200) {
+    return { res };
+  }
+  const body = parseBody<ListBudgetsResponse>(res);
+  const gsi2Call = ddbMock
+    .commandCalls(QueryCommand)
+    .find((call) => call.args[0].input.IndexName === 'GSI2');
+  const values = gsi2Call?.args[0].input.ExpressionAttributeValues as
+    | Record<string, string>
+    | undefined;
+  return {
+    res,
+    budget: body.items[0]!,
+    bounds:
+      values !== undefined
+        ? { start: values[':start']!, end: values[':end']! }
+        : undefined,
+  };
+}
+
+describe('GET /budgets — range mode (budget-range feature)', () => {
+  it('absent from/to keeps the current per-cadence behavior unchanged', async () => {
+    // No query params => monthly window, limit unchanged.
+    const expected = periodWindow('monthly', new Date(), 'America/New_York');
+    const { budget } = await getRangeBudget(50000, undefined, [{ amountMinor: -3500 }]);
+    expect(budget!.periodFrom).toBe(expected.from);
+    expect(budget!.periodTo).toBe(expected.to);
+    expect(budget!.limitMinor).toBe(50000);
+    expect(budget!.spentMinor).toBe(3500);
+  });
+
+  it('a valid range windows spend to [from, to] and prorates limitMinor', async () => {
+    // June 2026 has 30 days; the first 15 inclusive days (Jun 1..15) prorate a
+    // 50000 monthly cap to floor(50000 * 15 / 30) = 25000.
+    const { budget } = await getRangeBudget(
+      50000,
+      { from: '2026-06-01', to: '2026-06-15' },
+      [{ amountMinor: -1200 }, { amountMinor: -800 }],
+    );
+    expect(budget!.periodFrom).toBe('2026-06-01');
+    expect(budget!.periodTo).toBe('2026-06-15');
+    expect(budget!.limitMinor).toBe(25000);
+    expect(budget!.limit).toBe('250.00');
+    expect(budget!.spentMinor).toBe(2000);
+    // remainingMinor stays limitMinor - spentMinor against the prorated target.
+    expect(budget!.remainingMinor).toBe(23000);
+  });
+
+  it('a whole single month range prorates a monthly cap to exactly the stored limit', async () => {
+    const { budget } = await getRangeBudget(
+      50000,
+      { from: '2026-06-01', to: '2026-06-30' },
+      [{ amountMinor: -3500 }],
+    );
+    expect(budget!.limitMinor).toBe(50000);
+    expect(budget!.spentMinor).toBe(3500);
+  });
+
+  it('range spend reuses the GSI2 index over the supplied window', async () => {
+    const expectedBounds = gsiDateRangeBounds('2026-06-01', '2026-06-15');
+    const { bounds } = await getRangeBudget(
+      50000,
+      { from: '2026-06-01', to: '2026-06-15' },
+      [{ amountMinor: -2000 }],
+    );
+    expect(bounds!.start).toBe(expectedBounds.start);
+    expect(bounds!.end).toBe(expectedBounds.end);
+  });
+
+  it('rejects from > to with 400 VALIDATION_ERROR', async () => {
+    const { res } = await getRangeBudget(
+      50000,
+      { from: '2026-06-15', to: '2026-06-01' },
+      [],
+    );
+    expect(res.statusCode).toBe(400);
+    expect(parseBody<ErrorEnvelope>(res).error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('rejects a span over 366 days with 400 RANGE_TOO_LARGE', async () => {
+    const { res } = await getRangeBudget(
+      50000,
+      { from: '2025-01-01', to: '2026-06-01' },
+      [],
+    );
+    expect(res.statusCode).toBe(400);
+    expect(parseBody<ErrorEnvelope>(res).error.code).toBe('RANGE_TOO_LARGE');
+  });
+
+  it('rejects exactly one of from/to present with 400 VALIDATION_ERROR', async () => {
+    const onlyFrom = await getRangeBudget(50000, { from: '2026-06-01' }, []);
+    expect(onlyFrom.res.statusCode).toBe(400);
+    expect(parseBody<ErrorEnvelope>(onlyFrom.res).error.code).toBe('VALIDATION_ERROR');
+
+    const onlyTo = await getRangeBudget(50000, { to: '2026-06-15' }, []);
+    expect(onlyTo.res.statusCode).toBe(400);
+    expect(parseBody<ErrorEnvelope>(onlyTo.res).error.code).toBe('VALIDATION_ERROR');
+  });
+});
+
+describe('GET /budgets — transfer exclusion is GSI2-governed', () => {
+  it('sources spend ONLY from the GSI2 index, never from base-table TXN rows', async () => {
+    // The durable transfer-exclusion contract for budgets: spend is read live
+    // from GSI2, and computeGsi2Keys keeps transfers (isTransfer OR a TRANSFER
+    // category) out of that index (see packages/shared keys.test.ts). So the
+    // ONLY way a transfer could inflate a budget is if the route summed
+    // base-table TXN# rows directly — it must never do that. We prove the route
+    // issues no base-table TXN# spend query and sums exactly the GSI2 rows.
+    mockQueries([{ amountMinor: -2500 }, { amountMinor: -1000 }]);
+    const res = await handler(makeEvent({ routeKey: 'GET /budgets' }));
+    expect(res.statusCode).toBe(200);
+    const body = parseBody<ListBudgetsResponse>(res);
+    expect(body.items[0]!.spentMinor).toBe(3500);
+
+    const baseTableTxnQuery = ddbMock
+      .commandCalls(QueryCommand)
+      .map((call) => call.args[0].input)
+      .find(
+        (input) =>
+          input.IndexName === undefined &&
+          (input.ExpressionAttributeValues as Record<string, unknown> | undefined)?.[':prefix'] ===
+            'TXN#',
+      );
+    // No base-table TXN# scan for spend exists — spend is GSI2-only, so a
+    // transfer (absent from GSI2) can never reach a budget's spend sum.
+    expect(baseTableTxnQuery).toBeUndefined();
+  });
+});
+
 describe('POST /budgets', () => {
   it('creates the budget with a decimal-string limit and returns 201', async () => {
     ddbMock.on(GetCommand).resolves({ Item: makeCategoryItem('groceries', 'EXPENSE') });

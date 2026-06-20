@@ -81,6 +81,7 @@ const UI_DEFAULTS = {
   biometricEnabled: true,
   language: 'system',
   reduceAnimations: null,
+  accountGrouping: 'type',
 } as const;
 
 beforeAll(() => {

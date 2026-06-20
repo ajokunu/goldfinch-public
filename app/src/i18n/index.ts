@@ -29,9 +29,11 @@ export {
   matchesRuleFor,
   periodLimitLabel,
   periodPickerLabel,
+  rangeLabel,
   rulesExplainer,
   spentThisMonth,
   taggedCount,
+  weekRangeLabel,
 } from './messages';
 export { detectSystemLocale } from './systemLocale';
 export { useLang, useT } from './useT';

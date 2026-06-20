@@ -16,7 +16,6 @@ import {
 } from '../features/dashboard/lib/labels';
 import { localeTag } from '../src/i18n';
 import { currentIsoMonth } from '../src/lib/dates';
-import { formatMinorAmount } from '../src/ui/CurrencyAmount';
 import {
   listOf,
   makeAccountDto,
@@ -158,7 +157,7 @@ describe('P11-5 dashboard spending scope', () => {
       }),
     );
 
-    // Spending figure: an uncapped windowed read over the same week (limit 200).
+    // Spending breakdown: an uncapped windowed read over the same week (limit 200).
     await waitFor(() =>
       expect(txnRequests).toContainEqual({
         from: WEEK.from,
@@ -167,9 +166,16 @@ describe('P11-5 dashboard spending scope', () => {
       }),
     );
 
-    // The week spend figure sums the two expenses (42.15 + 12.00), excluding
-    // the income and the transfer legs: 54.15 in the card's own formatting.
-    const figure = formatMinorAmount(5_415, expenseA.currency);
-    expect(await screen.findByText(figure)).toBeOnTheScreen();
+    // The week scope now renders the SAME donut/legend as the month scope,
+    // aggregated client-side: one USD donut whose legend splits the two
+    // expenses by category (the categorized "Groceries" leg drills down; the
+    // null leg falls into the "Uncategorized" bucket). Income and transfer
+    // legs are excluded, so the donut total is 42.15 + 12.00 = 54.15.
+    expect(await screen.findByTestId('spending-donut-USD')).toBeOnTheScreen();
+    expect(
+      await screen.findByTestId('spending-legend-groceries'),
+    ).toBeOnTheScreen();
+    expect(await screen.findByText('Groceries')).toBeOnTheScreen();
+    expect(await screen.findByText('Uncategorized')).toBeOnTheScreen();
   });
 });

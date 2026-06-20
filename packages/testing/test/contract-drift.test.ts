@@ -78,7 +78,7 @@ import {
   makeHouseholdPayloadDayTwo,
   setApiTestEnv,
   TEST_NOW_ISO,
-  TEST_SUB_AARON,
+  TEST_SUB_ALEX,
   TEST_TABLE_NAME,
   type ApiEventInput,
 } from '../src/index.js';
@@ -371,7 +371,7 @@ describe('user categorization through the api (GSI2 spend index)', () => {
     expect(stored.GSI2SK).toBe(
       gsi2Sk(FIXTURE_DATES.coffeePending, FIXTURE_TXN_COFFEE),
     );
-    expect(stored.lastEditedBy).toBe(TEST_SUB_AARON);
+    expect(stored.lastEditedBy).toBe(TEST_SUB_ALEX);
     expect(stored.note).toBe('Morning espresso');
   });
 
@@ -408,44 +408,49 @@ describe('user categorization through the api (GSI2 spend index)', () => {
   });
 });
 
-describe('day two: pending->posted date shift survives with user edits intact', () => {
-  it('moves the coffee row to the new date bucket without duplicating', async () => {
+describe('day two: posting keeps the transacted-date bucket, user edits intact', () => {
+  it('keeps the coffee row in its transacted-date bucket when it posts (no re-key)', async () => {
     const result = await runSync(makeHouseholdPayloadDayTwo());
     expect(result.txnsUpserted).toBe(4);
-    expect(result.staleDeletes).toBe(1);
+    // The coffee txn carries transacted_at, so its SK bucket is the purchase
+    // date and STAYS there when it posts -- no re-key, no stale delete. (Only a
+    // txn lacking transacted_at shifts buckets pending->posted.)
+    expect(result.staleDeletes).toBe(0);
     expect(result.unprocessedCount).toBe(0);
 
     // Exactly one row per SimpleFIN txn id - the dominant correctness invariant.
     expect(table.countByPrefix(PK, KEY_PREFIX.transaction)).toBe(4);
+    // coffeePosted is the bank CLEARING date, not the SK bucket; the row stays
+    // in the transacted-date (coffeePending) bucket.
     expect(
-      table.getStored(PK, txnSk(FIXTURE_DATES.coffeePending, FIXTURE_TXN_COFFEE)),
+      table.getStored(PK, txnSk(FIXTURE_DATES.coffeePosted, FIXTURE_TXN_COFFEE)),
     ).toBeUndefined();
-    const moved = table.getStored(
+    const row = table.getStored(
       PK,
-      txnSk(FIXTURE_DATES.coffeePosted, FIXTURE_TXN_COFFEE),
+      txnSk(FIXTURE_DATES.coffeePending, FIXTURE_TXN_COFFEE),
     ) as Partial<TransactionItem>;
-    expect(moved).toBeDefined();
+    expect(row).toBeDefined();
 
-    // Bank-sourced fields refreshed from SimpleFIN (settled amount differs).
-    expect(moved.amountMinor).toBe(-710);
-    expect(moved.pending).toBe(false);
+    // Bank-sourced fields refreshed in place (settled amount differs, posted).
+    expect(row.amountMinor).toBe(-710);
+    expect(row.pending).toBe(false);
 
     // User-owned fields merged through, version bumped past the PATCH value.
-    expect(moved.categoryId).toBe(coffeeCategoryId);
-    expect(moved.userCategorized).toBe(true);
-    expect(moved.note).toBe('Morning espresso');
-    expect(moved.version ?? 0).toBeGreaterThan(coffeeVersionAfterPatch);
+    expect(row.categoryId).toBe(coffeeCategoryId);
+    expect(row.userCategorized).toBe(true);
+    expect(row.note).toBe('Morning espresso');
+    expect(row.version ?? 0).toBeGreaterThan(coffeeVersionAfterPatch);
 
-    // GSI2SK recomputed against the NEW date via the shared builder.
-    expect(moved.GSI2PK).toBe(gsi2Pk(HOUSEHOLD_ID, coffeeCategoryId));
-    expect(moved.GSI2SK).toBe(gsi2Sk(FIXTURE_DATES.coffeePosted, FIXTURE_TXN_COFFEE));
+    // GSI2SK stays at the transacted-date bucket (no re-key) via the builder.
+    expect(row.GSI2PK).toBe(gsi2Pk(HOUSEHOLD_ID, coffeeCategoryId));
+    expect(row.GSI2SK).toBe(gsi2Sk(FIXTURE_DATES.coffeePending, FIXTURE_TXN_COFFEE));
 
-    // Pointer re-targeted at the new SK.
+    // Pointer unchanged - the row never moved.
     const pointer = table.getStored(PK, txnPointerSk(FIXTURE_TXN_COFFEE)) as
       | TxnPointerItem
       | undefined;
     expect(pointer?.currentSk).toBe(
-      txnSk(FIXTURE_DATES.coffeePosted, FIXTURE_TXN_COFFEE),
+      txnSk(FIXTURE_DATES.coffeePending, FIXTURE_TXN_COFFEE),
     );
   });
 
@@ -458,7 +463,8 @@ describe('day two: pending->posted date shift survives with user edits intact', 
     expect(new Set(body.items.map((t) => t.txnId)).size).toBe(4);
     const coffee = body.items.find((t) => t.txnId === FIXTURE_TXN_COFFEE);
     expect(coffee).toMatchObject({
-      date: FIXTURE_DATES.coffeePosted,
+      // Stays in the transacted-date bucket after posting (no re-key).
+      date: FIXTURE_DATES.coffeePending,
       amount: '-7.10',
       amountMinor: -710,
       categoryId: coffeeCategoryId,

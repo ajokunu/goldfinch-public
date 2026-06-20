@@ -28,6 +28,7 @@ export const ko = {
   Home: '홈',
   Activity: '활동',
   Budget: '예산',
+  Investments: '투자',
   Reports: '리포트',
   More: '더보기',
 
@@ -73,6 +74,16 @@ export const ko = {
   Custom: '사용자 지정',
   'This week': '이번 주',
   'This month': '이번 달',
+
+  // Budget date-range presets (budget-range feature, Section 9.2). 'This week'
+  // / 'This month' / 'Custom' are reused above; these are the new preset labels
+  // + the chooser title. Korean copy proposed, flagged for native review.
+  'Last month': '지난달',
+  'Last 30 days': '최근 30일',
+  'Last 90 days': '최근 90일',
+  'This quarter': '이번 분기',
+  'Year to date': '연초부터 현재까지',
+  'Date range': '기간 선택',
 
   // Budget
   'Cash flow': '현금 흐름',
@@ -194,6 +205,11 @@ export const ko = {
     '대시보드에서 눈 아이콘을 누를 때까지 잔액을 가립니다',
   'Hide amounts': '금액 숨기기',
   'Show amounts': '금액 표시',
+  // Home-screen widget privacy toggle (separate from the per-session eye;
+  // ko proposed, flagged for native-speaker review before release).
+  'Show amounts on widget': '위젯에 금액 표시',
+  'Display spending totals on the home screen widget':
+    '홈 화면 위젯에 지출 합계를 표시합니다',
   'Require Face ID / biometric unlock': 'Face ID·생체 인증 잠금 사용',
   'Sign out': '로그아웃',
   'Signing out': '로그아웃 중',

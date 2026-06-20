@@ -7,7 +7,7 @@
  * `{ from, to }` are inclusive yyyy-mm-dd bounds, drop-in for the GSI2 date
  * BETWEEN range the budget-spend query already uses (GSI2SK = date).
  *
- *   - weekly:  current calendar week, SUNDAY .. SATURDAY (US convention).
+ *   - weekly:  current calendar week, MONDAY .. SUNDAY (ISO convention).
  *   - monthly: current calendar month, day 1 .. last day of month.
  *   - yearly:  current calendar year, Jan 1 .. Dec 31.
  *
@@ -16,6 +16,10 @@
  * in dates.ts, so there is no hand-rolled UTC-offset math here. Whole-day
  * arithmetic for the weekly window is done in the proleptic-UTC day calendar
  * (one fixed point per civil date), which never crosses a DST seam.
+ *
+ * `stepWeek` (Feature B — budget week navigation) derives from the weekly
+ * window and shifts it by whole weeks via the same civil-day arithmetic, so the
+ * Mon..Sun boundary is single-sourced and never re-derived.
  */
 
 import { DEFAULT_TZ } from './constants.js';
@@ -118,11 +122,49 @@ export function periodWindow(
       };
     }
     case 'weekly': {
-      // US week: Sunday(0)..Saturday(6). Step back to Sunday, forward to Saturday.
+      // ISO week: Monday(start) .. Sunday(end). weekdayInTz is 0=Sun..6=Sat;
+      // daysSinceMonday maps Mon->0, Tue->1, ... Sun->6, so a Sunday rolls back
+      // into the week that began the prior Monday. Step back to that Monday and
+      // forward to the following Sunday.
       const dow = weekdayInTz(now, tz);
-      const from = addCivilDays(today, -dow);
-      const to = addCivilDays(today, 6 - dow);
+      const daysSinceMonday = (dow + 6) % 7;
+      const from = addCivilDays(today, -daysSinceMonday);
+      const to = addCivilDays(today, 6 - daysSinceMonday);
       return { from: isoDateOfParts(from), to: isoDateOfParts(to) };
     }
   }
+}
+
+/**
+ * Step a Mon..Sun weekly window by `weekDelta` whole weeks (Feature B — budget
+ * week navigation). Derives from the SHIPPED weekly window so the Monday..Sunday
+ * boundary is single-sourced and can never drift from `periodWindow('weekly')`:
+ * it shifts BOTH `from` and `to` by `7 * weekDelta` civil days through the same
+ * proleptic-UTC `addCivilDays` the weekly window uses, so the window stays a full
+ * 7-day Mon..Sun span across every DST seam.
+ *
+ * - `weekDelta` 0 returns a window equal to `periodWindow('weekly', now, tz)`
+ *   (derivation, not duplication).
+ * - Negative steps go to earlier weeks, positive to later weeks; any integer is
+ *   allowed (every week exists — there is no min/max gate).
+ *
+ * Pure; never throws on valid input.
+ *
+ * @throws DateError if `now` is an invalid Date or `tz` is not a valid IANA zone
+ *   (surfaced via the underlying `periodWindow('weekly', ...)` call).
+ */
+export function stepWeek(
+  now: Date,
+  weekDelta: number,
+  tz: string = DEFAULT_TZ,
+): PeriodWindow {
+  if (!Number.isInteger(weekDelta)) {
+    throw new DateError(`weekDelta must be an integer, got ${JSON.stringify(weekDelta)}`);
+  }
+  const base = periodWindow('weekly', now, tz);
+  const shift = 7 * weekDelta;
+  return {
+    from: isoDateOfParts(addCivilDays(partsOfIsoDate(base.from), shift)),
+    to: isoDateOfParts(addCivilDays(partsOfIsoDate(base.to), shift)),
+  };
 }

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AppWidgetProviderInfo for the GoldFinch weekly-spend Glance widget. Installed
+  into android/app/src/main/res/xml/ by the withWeeklySpendWidget config plugin
+  and referenced from the AndroidManifest <receiver> meta-data
+  (android.appwidget.provider). resizeableAppWidget lets the host pick the small
+  square vs the wider medium tile (matched by GoldFinchWidget's responsive size
+  buckets). updatePeriodMillis is the daily host refresh floor; the WidgetBridge
+  drives the real-time updates by broadcasting APPWIDGET_UPDATE after each write.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="110dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="86400000"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:description="@string/goldfinch_widget_description"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:previewLayout="@layout/glance_default_loading_layout" />

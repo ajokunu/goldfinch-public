@@ -301,7 +301,7 @@ describe('Dashboard greeting (display name)', () => {
 
   it('prefers the user-chosen profile display name over the claim label', async () => {
     mockHappyRoutes();
-    mockApi.get('/profile', { displayName: 'Dami' });
+    mockApi.get('/profile', { displayName: 'Taylor' });
     await setTokens({
       accessToken: 'test-access-token',
       idToken: fakeJwt({ email: 'wpffkejd@example.com' }),
@@ -310,7 +310,7 @@ describe('Dashboard greeting (display name)', () => {
     renderWithProviders(<DashboardScreen />);
 
     expect(
-      await screen.findByText(greeting('en', HOUR, 'Dami')),
+      await screen.findByText(greeting('en', HOUR, 'Taylor')),
     ).toBeOnTheScreen();
     expect(screen.queryByText(greeting('en', HOUR, 'wpffkejd'))).toBeNull();
   });
@@ -340,13 +340,13 @@ describe('Dashboard greeting (display name)', () => {
     );
     await setTokens({
       accessToken: 'test-access-token',
-      idToken: fakeJwt({ given_name: 'Aaron' }),
+      idToken: fakeJwt({ given_name: 'Alex' }),
     });
 
     renderWithProviders(<DashboardScreen />);
 
     expect(
-      await screen.findByText(greeting('en', HOUR, 'Aaron')),
+      await screen.findByText(greeting('en', HOUR, 'Alex')),
     ).toBeOnTheScreen();
   });
 
@@ -389,17 +389,17 @@ describe('P8 greeting name edit', () => {
   }
 
   it('opens the edit sheet from the greeting, prefilled with the current name', async () => {
-    mockEditableProfile('Dami');
+    mockEditableProfile('Taylor');
 
     await openSheet();
 
     const input = await screen.findByTestId('greeting-name-input');
-    await waitFor(() => expect(input.props.value).toBe('Dami'));
+    await waitFor(() => expect(input.props.value).toBe('Taylor'));
     expect(screen.getByText('Save name')).toBeOnTheScreen();
   });
 
   it('saves through the same optimistic PATCH as Settings', async () => {
-    mockEditableProfile('Dami');
+    mockEditableProfile('Taylor');
     // Hold the PATCH so the optimistic window is observable.
     const gate = mockApi.defer('PATCH', '/profile');
 
@@ -426,7 +426,7 @@ describe('P8 greeting name edit', () => {
     // The sheet's own close contract, asserted directly (the ModalSheet
     // unmount itself rides an Animated completion the jest native-animated
     // mock never fires, so the dashboard-level tree cannot observe it).
-    mockApi.get('/profile', { displayName: 'Dami' });
+    mockApi.get('/profile', { displayName: 'Taylor' });
     mockApi.on('PATCH', '/profile', {
       status: 200,
       body: { displayName: 'Mina' },
@@ -444,7 +444,7 @@ describe('P8 greeting name edit', () => {
   });
 
   it('does not request close when the save fails', async () => {
-    mockApi.get('/profile', { displayName: 'Dami' });
+    mockApi.get('/profile', { displayName: 'Taylor' });
     mockApi.error('PATCH', '/profile', 409, 'VERSION_CONFLICT', 'lost the race');
     const onClose = jest.fn();
     renderWithProviders(<GreetingNameSheet visible onClose={onClose} />);
@@ -462,7 +462,7 @@ describe('P8 greeting name edit', () => {
   });
 
   it('sends the trimmed name as the PATCH body', async () => {
-    const { patchBodies } = mockEditableProfile('Dami');
+    const { patchBodies } = mockEditableProfile('Taylor');
 
     await openSheet();
     fireEvent.changeText(screen.getByTestId('greeting-name-input'), '  Mina  ');
@@ -476,7 +476,7 @@ describe('P8 greeting name edit', () => {
   it('rejects an out-of-bounds name locally without any PATCH', async () => {
     // No PATCH route registered: a stray request would fail in teardown.
     mockHappyRoutes();
-    mockApi.get('/profile', { displayName: 'Dami' });
+    mockApi.get('/profile', { displayName: 'Taylor' });
 
     await openSheet();
     fireEvent.changeText(screen.getByTestId('greeting-name-input'), '   ');
@@ -497,7 +497,7 @@ describe('P8 greeting name edit', () => {
 
   it('rolls the greeting back and keeps the sheet open on a 409', async () => {
     mockHappyRoutes();
-    mockApi.get('/profile', { displayName: 'Dami' });
+    mockApi.get('/profile', { displayName: 'Taylor' });
     mockApi.error('PATCH', '/profile', 409, 'VERSION_CONFLICT', 'other device won');
 
     await openSheet();
@@ -505,13 +505,13 @@ describe('P8 greeting name edit', () => {
     fireEvent.press(screen.getByText('Save name'));
 
     // Failure surfaces inline; the optimistic greeting rolls back to the
-    // server name (the settled refetch also returns Dami).
+    // server name (the settled refetch also returns Taylor).
     expect(
       await screen.findByText('Could not save your name'),
     ).toBeOnTheScreen();
     await waitFor(() =>
       expect(
-        screen.getByText(greeting('en', HOUR, 'Dami')),
+        screen.getByText(greeting('en', HOUR, 'Taylor')),
       ).toBeOnTheScreen(),
     );
     expect(screen.queryByText(greeting('en', HOUR, 'Mina'))).toBeNull();

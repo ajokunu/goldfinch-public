@@ -870,6 +870,62 @@ exports[`ApiStack snapshot 1`] = `
       },
       "Type": "AWS::Lambda::Permission",
     },
+    "HttpApiGETaccountsaccountIdholdingssymbolpricehistory8AD8CE9E": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "GET /accounts/{accountId}/holdings/{symbol}/price-history",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
+    },
+    "HttpApiGETaccountsaccountIdholdingssymbolpricehistoryApiIntegrationPermissionDA09D0B0": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/accounts/{accountId}/holdings/{symbol}/price-history",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
     "HttpApiGETaccountsaccountIdtransactions708C6AF0": {
       "Properties": {
         "ApiId": {
@@ -2360,6 +2416,62 @@ exports[`ApiStack snapshot 1`] = `
         },
       },
       "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiPOSTaccountsaccountIdholdingssymbolcostbasisApiIntegrationPermissionF0E6B1C9": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiFnE0725F78",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:us-east-1:111111111111:",
+              {
+                "Ref": "HttpApiF5A9A8A7",
+              },
+              "/*/*/accounts/{accountId}/holdings/{symbol}/cost-basis",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "HttpApiPOSTaccountsaccountIdholdingssymbolcostbasisC403598D": {
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApiF5A9A8A7",
+        },
+        "AuthorizationScopes": [
+          "goldfinch/api",
+        ],
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "HttpApiJwtAuthorizer14F16BDB",
+        },
+        "RouteKey": "POST /accounts/{accountId}/holdings/{symbol}/cost-basis",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "HttpApiGEThealthApiIntegration8B197B8C",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ApiGatewayV2::Route",
     },
     "HttpApiPOSTbudgetsApiIntegrationPermission792A41CE": {
       "Properties": {

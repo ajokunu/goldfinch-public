@@ -130,6 +130,35 @@ export function optText(
   return assertMaxLength(next, field, bound);
 }
 
+/**
+ * Optional override free-text field with clear semantics, for the USER-OWNED
+ * account label/institution overrides on PATCH /accounts. Three outcomes:
+ *
+ *   undefined  -> the key was absent: leave the stored attribute UNCHANGED.
+ *   null       -> the trimmed value is empty (an explicit `null`, "" or
+ *                 whitespace-only string): CLEAR/REMOVE the attribute so the
+ *                 effective value falls back to the synced one.
+ *   string     -> a non-empty trimmed value to SET, length-capped via the
+ *                 shared `bound` (over the cap is a 400 VALIDATION_ERROR).
+ *
+ * Combines optNullableString (preserves explicit null) with the trim +
+ * assertMaxLength pattern of optText, so the route declares the clear-vs-set
+ * decision in one call.
+ */
+export function optOverrideText(
+  body: Record<string, unknown>,
+  field: string,
+  bound: MaxTextLengthField,
+): string | null | undefined {
+  const value = optNullableString(body, field);
+  if (value === undefined) return undefined;
+  // null OR empty/whitespace-only string both mean "clear the override".
+  if (value === null) return null;
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return null;
+  return assertMaxLength(trimmed, field, bound);
+}
+
 export function optBool(
   body: Record<string, unknown>,
   field: string,

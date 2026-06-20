@@ -40,7 +40,7 @@ import {
   makeSyncStateItem,
   makeTransactionItem,
   makeTransactionWithPointer,
-  TEST_SUB_AARON,
+  TEST_SUB_ALEX,
 } from '../src/index.js';
 
 describe('item factories honor the shared key builders', () => {
@@ -102,7 +102,7 @@ describe('JWT claim fixtures', () => {
     expect(claims[HOUSEHOLD_CLAIM]).toBe('goldfinch-home');
     expect(claims['scope']).toBe(API_SCOPE);
     expect(claims['token_use']).toBe('access');
-    expect(claims['sub']).toBe(TEST_SUB_AARON);
+    expect(claims['sub']).toBe(TEST_SUB_ALEX);
     // Access tokens carry client_id, never aud.
     expect(claims['client_id']).toBeDefined();
     expect(claims).not.toHaveProperty('aud');

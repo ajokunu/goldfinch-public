@@ -169,7 +169,7 @@ describe('Settings display name (profile)', () => {
   it('shows the stored name and saves a trimmed edit through PATCH /profile', async () => {
     // Stateful mock server: the post-save invalidation refetch must return
     // the NEW name, exactly like the real API.
-    let stored: { displayName: string | null } = { displayName: 'Aaron' };
+    let stored: { displayName: string | null } = { displayName: 'Alex' };
     let patched: unknown;
     mockApi.on('GET', '/profile', () => ({ status: 200, body: stored }));
     mockApi.on('PATCH', '/profile', (request) => {
@@ -182,15 +182,15 @@ describe('Settings display name (profile)', () => {
 
     renderWithProviders(<SettingsScreen />);
 
-    expect(await screen.findByDisplayValue('Aaron')).toBeOnTheScreen();
+    expect(await screen.findByDisplayValue('Alex')).toBeOnTheScreen();
 
-    fireEvent.changeText(screen.getByTestId('display-name-input'), '  Dami  ');
+    fireEvent.changeText(screen.getByTestId('display-name-input'), '  Taylor  ');
     fireEvent.press(screen.getByText('Save name'));
 
     // The client sends the TRIMMED name (shared bounds rule).
-    await waitFor(() => expect(patched).toEqual({ displayName: 'Dami' }));
+    await waitFor(() => expect(patched).toEqual({ displayName: 'Taylor' }));
     // Optimistic cache + refetch converge on the saved name.
-    expect(await screen.findByDisplayValue('Dami')).toBeOnTheScreen();
+    expect(await screen.findByDisplayValue('Taylor')).toBeOnTheScreen();
     expect(
       screen.queryByText(
         displayNameLengthError(
@@ -223,19 +223,19 @@ describe('Settings display name (profile)', () => {
   });
 
   it('surfaces a save failure inline and keeps the draft for retry', async () => {
-    mockApi.get('/profile', { displayName: 'Aaron' });
+    mockApi.get('/profile', { displayName: 'Alex' });
     mockApi.error('PATCH', '/profile', 409, 'VERSION_CONFLICT', 'concurrent edit');
 
     renderWithProviders(<SettingsScreen />);
-    expect(await screen.findByDisplayValue('Aaron')).toBeOnTheScreen();
+    expect(await screen.findByDisplayValue('Alex')).toBeOnTheScreen();
 
-    fireEvent.changeText(screen.getByTestId('display-name-input'), 'Dami');
+    fireEvent.changeText(screen.getByTestId('display-name-input'), 'Taylor');
     fireEvent.press(screen.getByText('Save name'));
 
     expect(
       await screen.findByText('Could not save your name'),
     ).toBeOnTheScreen();
     // The draft stays in the field so the user can retry without retyping.
-    expect(screen.getByDisplayValue('Dami')).toBeOnTheScreen();
+    expect(screen.getByDisplayValue('Taylor')).toBeOnTheScreen();
   });
 });

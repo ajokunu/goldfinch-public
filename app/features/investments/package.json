@@ -2,11 +2,14 @@
   "name": "@goldfinch/feature-investments",
   "version": "0.1.0",
   "private": true,
-  "description": "GoldFinch investments feature (P7-3): account detail screen with the holdings positions table (symbol/shares/value/cost basis) and the explicit no-holdings-from-institution state. Lives inside the @goldfinch/app Expo workspace; not an independent npm workspace.",
+  "type": "module",
+  "description": "GoldFinch investments feature: the per-account detail screen with the holdings positions table (P7-3) AND the top-level Investments tab that aggregates holdings across every investment account (symbol-grouped, per-currency totals). Lives inside the @goldfinch/app Expo workspace; not an independent npm workspace.",
   "main": "./index.tsx",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.test.json && node --test dist-test/test/*.test.js",
+    "clean": "rm -rf dist-test"
   },
   "dependencies": {
     "@goldfinch/shared": "*",

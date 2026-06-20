@@ -141,6 +141,76 @@ export function periodLimitLabel(lang: Lang, period: PeriodArg): string {
   return `${word} limit`;
 }
 
+/**
+ * Compact, locale-aware label for a yyyy-mm-dd date used inside the budget
+ * range/week header sentences ("Jun 8"). The input is already an ET civil date
+ * (from periodWindow / the preset resolvers), so it is anchored at UTC midnight
+ * for Intl -- the device-local calendar is NEVER consulted, so the label can
+ * never shift a day for a user outside ET. `year` appends the year for
+ * cross-year spans. Falls back to the raw string for malformed input.
+ */
+function compactDay(isoDate: string, locale?: string, year = false): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
+  if (!match) return isoDate;
+  const date = new Date(
+    Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])),
+  );
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      month: 'short',
+      day: 'numeric',
+      year: year ? 'numeric' : undefined,
+      timeZone: 'UTC',
+    }).format(date);
+  } catch {
+    return isoDate;
+  }
+}
+
+/** Whether two yyyy-mm-dd dates fall in different calendar years. */
+function crossesYear(from: string, to: string): boolean {
+  return from.slice(0, 4) !== to.slice(0, 4);
+}
+
+/**
+ * Budget week-stepper label: the active Monday..Sunday span ("Jun 8 - Jun 14").
+ * `from`/`to` are inclusive ET civil dates from the shared `stepWeek` helper;
+ * `locale` is the BCP-47 tag from `localeTag(lang)`. The year is appended only
+ * when the week straddles a year boundary. Korean uses the same compact span
+ * with a tilde separator (the conventional Korean date-range joiner).
+ */
+export function weekRangeLabel(
+  lang: Lang,
+  from: string,
+  to: string,
+  locale?: string,
+): string {
+  const withYear = crossesYear(from, to);
+  const a = compactDay(from, locale, withYear);
+  const b = compactDay(to, locale, withYear);
+  return lang === 'ko' ? `${a} ~ ${b}` : `${a} - ${b}`;
+}
+
+/**
+ * Budget range-mode header label when a date-range preset is active but its
+ * span is not a single calendar month ("Jun 1 - Jun 14"). The caller passes the
+ * preset's localized name when a preset cleanly maps to one (e.g. "This
+ * month"); this is the explicit-span fallback. Year is appended for cross-year
+ * spans (e.g. Year-to-date in January would not, but Last 90 across New Year
+ * would).
+ */
+export function rangeLabel(
+  lang: Lang,
+  from: string,
+  to: string,
+  locale?: string,
+): string {
+  const withYear = crossesYear(from, to);
+  const a = compactDay(from, locale, withYear);
+  const b = compactDay(to, locale, withYear);
+  return lang === 'ko' ? `${a} ~ ${b}` : `${a} - ${b}`;
+}
+
 export function greeting(lang: Lang, hour: number, name?: string): string {
   const base =
     lang === 'ko'

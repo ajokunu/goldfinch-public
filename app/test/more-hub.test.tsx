@@ -27,7 +27,7 @@ describe('More hub', () => {
   it('renders every destination row and navigates on press', async () => {
     seedSecureStore(
       SECURE_KEYS.idToken,
-      fakeIdToken({ name: 'Aaron', email: 'aaron@example.com' }),
+      fakeIdToken({ name: 'Alex', email: 'alex@example.com' }),
     );
     renderWithProviders(<MoreHubScreen />);
 
@@ -52,20 +52,20 @@ describe('More hub', () => {
   it('renders the profile card from the stored ID token claims', async () => {
     seedSecureStore(
       SECURE_KEYS.idToken,
-      fakeIdToken({ name: 'Aaron', email: 'aaron@example.com' }),
+      fakeIdToken({ name: 'Alex', email: 'alex@example.com' }),
     );
     renderWithProviders(<MoreHubScreen />);
 
-    expect(await screen.findByText('Aaron')).toBeOnTheScreen();
-    expect(screen.getByText('aaron@example.com')).toBeOnTheScreen();
+    expect(await screen.findByText('Alex')).toBeOnTheScreen();
+    expect(screen.getByText('alex@example.com')).toBeOnTheScreen();
   });
 
   it('degrades to identity-free chrome when no ID token exists', async () => {
     renderWithProviders(<MoreHubScreen />);
 
     expect(await screen.findByText('Goals')).toBeOnTheScreen();
-    expect(screen.queryByText('Aaron')).toBeNull();
-    expect(screen.queryByText('aaron@example.com')).toBeNull();
+    expect(screen.queryByText('Alex')).toBeNull();
+    expect(screen.queryByText('alex@example.com')).toBeNull();
   });
 
   it('renders the brand footer with wordmark and version line', async () => {

@@ -49,6 +49,27 @@ export interface RuleSpec {
   priority: number;
   /** undefined counts as enabled (pre-Phase-7 writers never set it). */
   enabled?: boolean;
+  /**
+   * When true, applying this rule also marks the matched transaction
+   * `isTransfer=true` — the universal transfer signal honored by the client
+   * donut (spend.ts) and the GSI2 spend index (computeGsi2Keys returns null,
+   * evicting the row). This is an ACTION the apply paths consume, never a match
+   * CONDITION, so ruleMatches/findMatchingRule/compareRulePrecedence ignore it
+   * (precedence and determinism are untouched). Absent == false (back-compat:
+   * pre-transfer-rule writers never set it). A markTransfer rule SHOULD also
+   * assign a TRANSFER-typed category so both transfer signals stay coherent and
+   * the row is excluded by either mechanism.
+   */
+  markTransfer?: boolean;
+}
+
+/**
+ * Whether a rule's ACTION marks its matched transactions as transfers. The one
+ * place this boolean is derived, so the API apply-now route and the services/ai
+ * daily rules pass never re-implement it (a drift class). Absent == false.
+ */
+export function ruleMarksTransfer(rule: RuleSpec): boolean {
+  return rule.markTransfer === true;
 }
 
 /** The minimal transaction shape the matcher needs. */

@@ -19,6 +19,8 @@ import type {
   Gsi1Sk,
   Gsi2Pk,
   Gsi2Sk,
+  HoldingBasisSk,
+  HoldingPriceSnapshotSk,
   HoldingSk,
   ImportTxnPointerSk,
   NetWorthSk,
@@ -58,6 +60,8 @@ export type EntityType =
   | 'GOAL'
   | 'GOAL_CONTRIBUTION'
   | 'HOLDING'
+  | 'HOLDING_BASIS'
+  | 'HOLDING_PRICE_SNAPSHOT'
   | 'NETWORTH_SNAPSHOT'
   | 'RULE'
   | 'IMPORT_TXN_POINTER'
@@ -204,6 +208,22 @@ export interface AccountItem extends BaseItem {
    * source.
    */
   isLiabilityOverride?: boolean;
+  /**
+   * USER-OWNED display-name override (custom label), set only by
+   * PATCH /accounts/{accountId}. Sync must NEVER write or clear it (the synced
+   * `name` stays fresh underneath for reference). Absent/empty == no override.
+   * Readers must NOT apply precedence themselves — go through
+   * `effectiveAccountName()` in `../accountTypes.js`, the sole precedence source.
+   */
+  nameOverride?: string;
+  /**
+   * USER-OWNED institution/bank-label override, set only by
+   * PATCH /accounts/{accountId}. Sync must NEVER write or clear it (the synced
+   * `institution` stays fresh underneath). Absent/empty == no override. Readers
+   * must NOT apply precedence themselves — go through `effectiveInstitution()`
+   * in `../accountTypes.js`, the sole precedence source.
+   */
+  institutionOverride?: string;
 }
 
 export type CategorizedBy = 'rule' | 'ai' | 'user' | null;
@@ -508,11 +528,49 @@ export interface HoldingItem extends BaseItem {
   description: string;
   shares: DecimalString;
   costBasisMinor?: MinorUnits;
+  /**
+   * SimpleFIN `purchase_price` (Part C), captured as an additive feed fallback
+   * cost source when non-zero (a feed 0 is "unavailable", left unset — same
+   * zero-guard as `costBasisMinor`). SYNC-OWNED, not user-owned: it lives on the
+   * blindly-replaced holding item, never carries manual entry. Expected absent
+   * for the household's tax-advantaged accounts; never blocks the manual path.
+   */
+  purchasePriceMinor?: MinorUnits;
   marketValueMinor: MinorUnits;
   currency: CurrencyCode;
   /** SimpleFIN holding timestamp, epoch seconds. */
   asOf: EpochSeconds;
   lastSyncedAt: IsoTimestamp;
+}
+
+/**
+ * User-owned manual cost basis for an investment position (Investments
+ * enrichment, Part A). Written ONLY by the API (POST
+ * /accounts/{accountId}/holdings/{symbol}/cost-basis), keyed on the stable
+ * (accountId, symbol) identity. It is sync-safe BY CONSTRUCTION: sync's
+ * holdings writer only enumerates HOLDING#<accountId>#<holdingId> SKs and only
+ * SETs the ACCOUNT_SYNC_OWNED_* lists, so this HOLDINGBASIS# item is never
+ * referenced and survives every sync run with no allow-list entry. NEVER add a
+ * user-owned field to HoldingItem (holdings are replaced wholesale per sync).
+ * `costBasisMinor` is the TOTAL amount the user paid for the position; the
+ * stored `currency` matches the holding's currency at entry time so a
+ * read-time join can require same-currency before computing gain.
+ */
+export interface HoldingBasisItem extends BaseItem {
+  SK: HoldingBasisSk;
+  entityType: 'HOLDING_BASIS';
+  accountId: string;
+  /** Stable position identity; matches the SK symbol component. */
+  symbol: string;
+  /** TOTAL cost paid for the position, integer minor units. */
+  costBasisMinor: MinorUnits;
+  currency: CurrencyCode;
+  /** Cognito sub of the user who entered the basis. */
+  createdBy: string;
+  createdAt: IsoTimestamp;
+  updatedAt?: IsoTimestamp;
+  /** Optimistic-locking counter (same convention as goals/rules). */
+  version?: number;
 }
 
 /** One currency's slice of a net-worth snapshot. Pure minor-unit integers. */
@@ -542,6 +600,27 @@ export interface NetWorthSnapshotItem extends BaseItem {
   createdAt: IsoTimestamp;
 }
 
+/**
+ * Daily price-per-share snapshot for one position (Investments chart), written
+ * by sync after each successful run (idempotent overwrite per calendar day).
+ * `pricePerShareMinor` = market_value / shares in integer minor units (BigInt-
+ * exact, shares > 0). Keyed on (accountId, symbol, date); sync's holdings-replace
+ * logic only enumerates HOLDING# SKs, so this item survives every sync by
+ * construction. The client normalizes the series to a % return (the shared
+ * holdingReturn helper); no normalized value is stored.
+ */
+export interface HoldingPriceSnapshotItem extends BaseItem {
+  SK: HoldingPriceSnapshotSk;
+  entityType: 'HOLDING_PRICE_SNAPSHOT';
+  date: IsoDate;
+  accountId: string;
+  symbol: string;
+  currency: CurrencyCode;
+  /** Price per share at snapshot time, integer minor units (market_value / shares). */
+  pricePerShareMinor: MinorUnits;
+  createdAt: IsoTimestamp;
+}
+
 export type RuleMatchType = 'exact' | 'prefix' | 'contains';
 
 /**
@@ -568,6 +647,15 @@ export interface RuleItem extends BaseItem {
   priority: number;
   /** Disabled rules are kept but never match. */
   enabled: boolean;
+  /**
+   * When true, applying this rule also sets the matched transaction's
+   * `isTransfer=true` (and, via computeGsi2Keys, evicts it from the spend
+   * index). The durable mechanism for marking credit-card payments and the
+   * deposits that fund them as transfers so they leave income AND spend.
+   * Optional/additive: absent == false (pre-transfer-rule items). Consumed via
+   * `ruleMarksTransfer` from `@goldfinch/shared/rules`; never a match condition.
+   */
+  markTransfer?: boolean;
   /** Optimistic-locking counter. */
   version: number;
   /** Cognito sub of the creator. */
@@ -651,6 +739,8 @@ export type GoldFinchItem =
   | GoalItem
   | GoalContributionItem
   | HoldingItem
+  | HoldingBasisItem
+  | HoldingPriceSnapshotItem
   | NetWorthSnapshotItem
   | RuleItem
   | ImportTxnPointerItem

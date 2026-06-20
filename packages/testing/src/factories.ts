@@ -35,7 +35,7 @@ import type {
   TxnPointerItem,
   UserProfileItem,
 } from '@goldfinch/shared/types';
-import { TEST_NOW_ISO, TEST_SUB_AARON } from './jwt.js';
+import { TEST_NOW_ISO, TEST_SUB_ALEX } from './jwt.js';
 
 /** Default epoch used for balance dates (2026-06-09 12:00:00 UTC). */
 export const TEST_BALANCE_EPOCH = Math.floor(Date.parse(TEST_NOW_ISO) / 1000);
@@ -51,14 +51,14 @@ export function makeUserProfileItem(
   input: ProfileFactoryInput = {},
 ): UserProfileItem {
   const household = input.household ?? HOUSEHOLD_ID;
-  const sub = input.sub ?? TEST_SUB_AARON;
+  const sub = input.sub ?? TEST_SUB_ALEX;
   return {
     PK: userPk(household),
     SK: profileSk(sub),
     entityType: 'USER',
     schemaVersion: SCHEMA_VERSION,
     cognitoSub: sub,
-    displayName: input.displayName ?? 'Aaron',
+    displayName: input.displayName ?? 'Alex',
     baseCurrency: 'USD',
     householdId: household,
     createdAt: TEST_NOW_ISO,

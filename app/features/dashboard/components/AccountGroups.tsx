@@ -6,14 +6,14 @@
  *
  * Row anatomy: 38px account-type identity well (AccountTypeIcon,
  * ops/design-spec/icons.md) + two-line text (name over institution/type) +
- * signed balance. Rows navigate to the Activity tab with the account filter
- * param (the shell's `?param` contract -- the screen lands on the real
- * Activity view either way).
+ * signed balance. Rows navigate to the account detail/edit screen
+ * (/accounts/[accountId]), which carries the "View transactions" affordance
+ * into the Activity tab -- so the account-scoped transaction path is preserved
+ * one hop deeper.
  *
  * GAP (1.5): the prototype's "···· 4471" mask is omitted -- no mask field
  * exists on SummaryAccount.
  */
-import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -25,13 +25,12 @@ import type { SummaryAccount, SummaryResponse } from '@goldfinch/shared/types';
 
 import { useT } from '../../../src/i18n';
 import { logger } from '../../../src/lib/logger';
+import { useUiStore, type AccountGrouping } from '../../../src/state/uiStore';
 import { CurrencyAmount } from '../../../src/ui/CurrencyAmount';
 import { AccountTypeIcon } from '../../../src/ui/icons';
 import { Segmented } from '../../../src/ui/Segmented';
 import { useTheme } from '../../../src/ui/ThemeProvider';
 import { Card, CardHeader } from './Card';
-
-type GroupingMode = 'institution' | 'type';
 
 const log = logger.child({ screen: 'dashboard', card: 'accounts' });
 
@@ -59,7 +58,7 @@ function AccountRow({
     <Pressable
       onPress={() =>
         router.push({
-          pathname: '/transactions',
+          pathname: '/accounts/[accountId]',
           params: { accountId: account.accountId },
         })
       }
@@ -182,7 +181,10 @@ function SectionHeading({ label }: { label: string }) {
 
 export function AccountGroups({ summary }: { summary: SummaryResponse }) {
   const t = useT();
-  const [mode, setMode] = useState<GroupingMode>('institution');
+  // Grouping defaults to 'type' and the choice persists across reloads through
+  // the UI store (the toggle is pure client presentation over the same summary).
+  const mode = useUiStore((s) => s.accountGrouping);
+  const setMode = useUiStore((s) => s.setAccountGrouping);
 
   const assetGroups = summary.byType.filter((group) => !group.isLiability);
   const liabilityGroups = summary.byType.filter((group) => group.isLiability);
@@ -193,10 +195,10 @@ export function AccountGroups({ summary }: { summary: SummaryResponse }) {
         title={t('Accounts')}
         right={
           <View style={styles.toggleWrap}>
-            <Segmented<GroupingMode>
+            <Segmented<AccountGrouping>
               options={[
-                { key: 'institution', label: t('Bank') },
                 { key: 'type', label: t('Type') },
+                { key: 'institution', label: t('Bank') },
               ]}
               value={mode}
               onChange={setMode}

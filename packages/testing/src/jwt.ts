@@ -17,8 +17,8 @@ import {
 } from '@goldfinch/shared/constants';
 
 /** The two real household members, as stable synthetic Cognito subs. */
-export const TEST_SUB_AARON = '11111111-aaaa-4aaa-8aaa-111111111111';
-export const TEST_SUB_DAMI = '22222222-bbbb-4bbb-8bbb-222222222222';
+export const TEST_SUB_ALEX = '11111111-aaaa-4aaa-8aaa-111111111111';
+export const TEST_SUB_TAYLOR = '22222222-bbbb-4bbb-8bbb-222222222222';
 
 export const TEST_ISSUER =
   'https://cognito-idp.us-east-1.amazonaws.com/us-east-1_TESTPOOL';
@@ -31,7 +31,7 @@ export const TEST_NOW_EPOCH = Math.floor(Date.parse(TEST_NOW_ISO) / 1000);
 export interface JwtClaimsInput {
   /** Defaults to the locked household id "goldfinch-home". */
   household?: string;
-  /** Defaults to TEST_SUB_AARON. */
+  /** Defaults to TEST_SUB_ALEX. */
   sub?: string;
   scope?: string;
   /** Merged last; set a key to undefined-like '' to keep, or use omit list. */
@@ -46,7 +46,7 @@ export interface JwtClaimsInput {
  */
 export function makeJwtClaims(input: JwtClaimsInput = {}): Record<string, string> {
   const claims: Record<string, string> = {
-    sub: input.sub ?? TEST_SUB_AARON,
+    sub: input.sub ?? TEST_SUB_ALEX,
     [HOUSEHOLD_CLAIM]: input.household ?? HOUSEHOLD_ID,
     scope: input.scope ?? API_SCOPE,
     token_use: 'access',
@@ -56,7 +56,7 @@ export function makeJwtClaims(input: JwtClaimsInput = {}): Record<string, string
     auth_time: String(TEST_NOW_EPOCH),
     iat: String(TEST_NOW_EPOCH),
     exp: String(TEST_NOW_EPOCH + 3600),
-    username: input.sub ?? TEST_SUB_AARON,
+    username: input.sub ?? TEST_SUB_ALEX,
     ...(input.overrides ?? {}),
   };
   for (const key of input.omit ?? []) {

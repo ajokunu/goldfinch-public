@@ -116,6 +116,35 @@ describe('POST /rules', () => {
     expect(res.statusCode).toBe(400);
     expect(parseBody<ErrorEnvelope>(res).error.message).toContain('ghost');
   });
+
+  it('persists and surfaces markTransfer when provided (transfer-detection rule)', async () => {
+    ddbMock.on(GetCommand).resolves({ Item: makeCategoryItem('transfers', 'TRANSFER') });
+    ddbMock.on(PutCommand).resolves({});
+    const res = await handler(
+      createEvent({
+        matchType: 'exact',
+        pattern: 'autopay credit card',
+        categoryId: 'transfers',
+        markTransfer: true,
+      }),
+    );
+    expect(res.statusCode).toBe(201);
+    expect(parseBody<RuleResponse>(res).markTransfer).toBe(true);
+    const put = ddbMock.commandCalls(PutCommand)[0]!.args[0].input;
+    expect((put.Item as Record<string, unknown>)['markTransfer']).toBe(true);
+  });
+
+  it('omits markTransfer from the item and DTO when not provided (back-compat)', async () => {
+    ddbMock.on(GetCommand).resolves({ Item: makeCategoryItem('groceries', 'EXPENSE') });
+    ddbMock.on(PutCommand).resolves({});
+    const res = await handler(
+      createEvent({ matchType: 'exact', pattern: 'whole foods', categoryId: 'groceries' }),
+    );
+    expect(res.statusCode).toBe(201);
+    expect(parseBody<RuleResponse>(res).markTransfer).toBeUndefined();
+    const put = ddbMock.commandCalls(PutCommand)[0]!.args[0].input;
+    expect((put.Item as Record<string, unknown>)['markTransfer']).toBeUndefined();
+  });
 });
 
 describe('PATCH /rules/{ruleId}', () => {
@@ -152,6 +181,34 @@ describe('PATCH /rules/{ruleId}', () => {
     expect(res.statusCode).toBe(200);
     const update = ddbMock.commandCalls(UpdateCommand)[0]!.args[0].input;
     expect(update.ExpressionAttributeValues?.[':amountMinMinor']).toBeNull();
+  });
+
+  it('sets markTransfer on patch (turning a categorization rule into a transfer rule)', async () => {
+    ddbMock
+      .on(GetCommand, { Key: { PK, SK: 'RULE#r-1' } })
+      .resolves({ Item: makeRuleItem('r-1') });
+    ddbMock.on(UpdateCommand).resolves({
+      Attributes: makeRuleItem('r-1', { markTransfer: true, version: 2 }),
+    });
+    const res = await handler(patchEvent({ markTransfer: true, version: 1 }));
+    expect(res.statusCode).toBe(200);
+    expect(parseBody<RuleResponse>(res).markTransfer).toBe(true);
+    const update = ddbMock.commandCalls(UpdateCommand)[0]!.args[0].input;
+    expect(update.ExpressionAttributeValues?.[':markTransfer']).toBe(true);
+    expect(update.UpdateExpression).toContain('#markTransfer = :markTransfer');
+  });
+
+  it('leaves markTransfer untouched when the patch omits it', async () => {
+    ddbMock
+      .on(GetCommand, { Key: { PK, SK: 'RULE#r-1' } })
+      .resolves({ Item: makeRuleItem('r-1', { markTransfer: true }) });
+    ddbMock.on(UpdateCommand).resolves({
+      Attributes: makeRuleItem('r-1', { markTransfer: true, pattern: 'costco', version: 2 }),
+    });
+    const res = await handler(patchEvent({ pattern: 'Costco', version: 1 }));
+    expect(res.statusCode).toBe(200);
+    const update = ddbMock.commandCalls(UpdateCommand)[0]!.args[0].input;
+    expect(update.UpdateExpression).not.toContain('#markTransfer');
   });
 
   it('validates the post-patch bound pairing against stored values', async () => {
@@ -251,6 +308,55 @@ describe('POST /rules/{ruleId}/apply', () => {
     // userCategorized is guarded, never set by a rule.
     expect(update.UpdateExpression).not.toContain('#userCategorized =');
     expect(update.ConditionExpression).toContain('#categoryId = :null');
+    // Regression lock: an ordinary rule never touches isTransfer.
+    expect(update.UpdateExpression).not.toContain('#isTransfer');
+    expect(update.ExpressionAttributeValues?.[':true']).toBeUndefined();
+  });
+
+  it('a markTransfer rule sets isTransfer=true, removes GSI2 keys, and assigns the (transfer) category', async () => {
+    // The rule assigns a TRANSFER-typed category AND marks transfer — the
+    // belt-and-suspenders two-signal write (both excluded everywhere).
+    ddbMock
+      .on(GetCommand, { Key: { PK, SK: 'RULE#r-1' } })
+      .resolves({
+        Item: makeRuleItem('r-1', {
+          pattern: 'autopay credit card',
+          categoryId: 'transfers',
+          markTransfer: true,
+        }),
+      });
+    ddbMock
+      .on(GetCommand, { Key: { PK, SK: 'CATEGORY#transfers' } })
+      .resolves({ Item: makeCategoryItem('transfers', 'TRANSFER') });
+    ddbMock.on(QueryCommand).resolves({
+      Items: [
+        makeTxnItem({
+          SK: 'TXN#2026-06-01#t-cc',
+          payeeLower: 'autopay credit card',
+          amountMinor: -120_000,
+        }),
+      ],
+    });
+    ddbMock.on(UpdateCommand).resolves({});
+
+    const res = await handler(applyEvent({ from: '2026-06-01', to: '2026-06-30' }));
+    expect(res.statusCode).toBe(200);
+    expect(parseBody<ApplyRuleResponse>(res)).toEqual({
+      ruleId: 'r-1',
+      matchedCount: 1,
+      updatedCount: 1,
+    });
+
+    const update = ddbMock.commandCalls(UpdateCommand)[0]!.args[0].input;
+    expect(update.ExpressionAttributeValues?.[':categoryId']).toBe('transfers');
+    // The durable per-row transfer signal is written.
+    expect(update.UpdateExpression).toContain('#isTransfer = :true');
+    expect(update.ExpressionAttributeValues?.[':true']).toBe(true);
+    expect(update.ExpressionAttributeNames?.['#isTransfer']).toBe('isTransfer');
+    // computeGsi2Keys returns null for a transfer -> the row is evicted from
+    // the spend index in the same write (never SETs gsi2 keys).
+    expect(update.UpdateExpression).toContain('REMOVE #gsi2pk, #gsi2sk');
+    expect(update.ExpressionAttributeValues?.[':gsi2pk']).toBeUndefined();
   });
 
   it('respects amount bounds (inclusive, on the magnitude)', async () => {

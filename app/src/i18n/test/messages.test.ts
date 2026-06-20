@@ -133,8 +133,8 @@ describe('greeting', () => {
   });
 
   it('appends the name verbatim in both languages', () => {
-    assert.equal(greeting('en', 9, 'Aaron'), 'Good morning, Aaron');
-    assert.equal(greeting('ko', 9, 'Aaron'), '좋은 아침이에요, Aaron');
+    assert.equal(greeting('en', 9, 'Alex'), 'Good morning, Alex');
+    assert.equal(greeting('ko', 9, 'Alex'), '좋은 아침이에요, Alex');
   });
 
   it('omits the name suffix when absent or empty', () => {

@@ -87,6 +87,39 @@ describe('GET /summary (and its GET /networth alias)', () => {
     expect(chase.accounts).toHaveLength(2);
   });
 
+  it('groups by the EFFECTIVE institution so a renamed bank groups under its override', async () => {
+    ddbMock.on(QueryCommand).resolves({
+      Items: [
+        makeAccountItem({
+          SK: 'ACCT#a1',
+          accountType: 'checking',
+          institution: 'Chase',
+          balanceMinor: 100_000,
+        }),
+        // Synced under "Chase Bank, N.A." but the user relabeled it "Chase":
+        // both accounts must land in ONE "Chase" group keyed on the effective
+        // value, never split across the raw synced strings.
+        makeAccountItem({
+          SK: 'ACCT#a2',
+          accountType: 'savings',
+          institution: 'Chase Bank, N.A.',
+          institutionOverride: 'Chase',
+          balanceMinor: 200_000,
+        }),
+      ],
+    });
+    const res = await handler(makeEvent({ routeKey: 'GET /summary' }));
+    const body = parseBody<SummaryResponse>(res);
+
+    const chase = body.byInstitution.find((group) => group.institution === 'Chase')!;
+    expect(chase.accounts).toHaveLength(2);
+    expect(chase.totalMinor).toBe(300_000);
+    // The raw synced label is not a separate group.
+    expect(
+      body.byInstitution.find((group) => group.institution === 'Chase Bank, N.A.'),
+    ).toBeUndefined();
+  });
+
   it('never mixes currencies into the totals (P7-7): non-base accounts are listed, not summed', async () => {
     ddbMock.on(QueryCommand).resolves({
       Items: [
@@ -199,6 +232,46 @@ describe('GET /accounts', () => {
     const checking = body.items.find((account) => account.accountId === 'a1')!;
     expect(checking.isLiability).toBe(false);
     expect(checking.balance).toBe('5230.55');
+  });
+
+  it('maps effective name/institution plus the synced + override fields', async () => {
+    ddbMock.on(QueryCommand).resolves({
+      Items: [
+        // No overrides: effective == synced, no override keys emitted.
+        makeAccountItem({
+          SK: 'ACCT#a1',
+          name: 'Checking',
+          institution: 'Chase',
+        }),
+        // Both overrides set: effective wins, synced rides along as a subtitle.
+        makeAccountItem({
+          SK: 'ACCT#a9',
+          name: 'Quicksilver (2224)',
+          institution: 'Capital One',
+          nameOverride: 'Travel Card',
+          institutionOverride: 'My Bank',
+        }),
+      ],
+    });
+    const res = await handler(makeEvent({ routeKey: 'GET /accounts' }));
+    const body = parseBody<ListAccountsResponse>(res);
+
+    const plain = body.items.find((account) => account.accountId === 'a1')!;
+    expect(plain.name).toBe('Checking');
+    expect(plain.syncedName).toBe('Checking');
+    expect(plain.institution).toBe('Chase');
+    expect(plain.syncedInstitution).toBe('Chase');
+    // Absent overrides are not surfaced (prior wire shape preserved).
+    expect(plain.nameOverride).toBeUndefined();
+    expect(plain.institutionOverride).toBeUndefined();
+
+    const renamed = body.items.find((account) => account.accountId === 'a9')!;
+    expect(renamed.name).toBe('Travel Card');
+    expect(renamed.syncedName).toBe('Quicksilver (2224)');
+    expect(renamed.nameOverride).toBe('Travel Card');
+    expect(renamed.institution).toBe('My Bank');
+    expect(renamed.syncedInstitution).toBe('Capital One');
+    expect(renamed.institutionOverride).toBe('My Bank');
   });
 
   it('reports P8-4 effective values: accountTypeId honors typeOverride and drives isLiability', async () => {

@@ -59,7 +59,15 @@ export const queryKeys = {
   },
 
   budgets: {
+    /** Default current-period budgets (each windowed by its own cadence). */
     all: () => [...root, 'budgets'] as const,
+    /**
+     * Budgets windowed to an arbitrary inclusive [from,to] range (budget-range
+     * feature). Cached independently of `all()` so a range view never clobbers
+     * the default current-period query.
+     */
+    range: (from: IsoDate, to: IsoDate) =>
+      [...root, 'budgets', 'range', from, to] as const,
   },
 
   categories: {
@@ -101,6 +109,13 @@ export const queryKeys = {
     all: () => [...root, 'holdings'] as const,
     /** GET /accounts/{accountId}/holdings (P7-3). */
     byAccount: (accountId: string) => [...root, 'holdings', accountId] as const,
+    /**
+     * GET /accounts/{accountId}/holdings/{symbol}/price-history (Investments
+     * chart). Each range window is cached independently by its `from` bound;
+     * '' = server default ('to' defaults to today, 'from' to earliest snapshot).
+     */
+    priceHistory: (accountId: string, symbol: string, from?: IsoDate, to?: IsoDate) =>
+      [...root, 'holdings', 'priceHistory', accountId, symbol, from ?? '', to ?? ''] as const,
   },
 
   netWorthHistory: {

@@ -124,12 +124,12 @@ describe('isHiddenTabItemStyle (expo-router href:null filter)', () => {
 describe('profileFromClaims (shell.md 3.1 identity rules)', () => {
   it('uses the name claim with the email as the secondary line', () => {
     const profile = profileFromClaims({
-      name: 'Aaron',
-      email: 'aaron@example.com',
+      name: 'Alex',
+      email: 'alex@example.com',
     });
     assert.deepEqual(profile, {
-      name: 'Aaron',
-      email: 'aaron@example.com',
+      name: 'Alex',
+      email: 'alex@example.com',
       initial: 'A',
     });
   });

@@ -26,6 +26,7 @@ import {
   ACCOUNT_TYPES,
   ACCOUNT_TYPE_IDS,
   effectiveAccountType,
+  effectiveInstitution,
   effectiveIsLiability,
   toLegacyAccountType,
 } from '@goldfinch/shared/accountTypes';
@@ -118,11 +119,13 @@ export async function getSummary(
     });
   }
 
-  const institutions = [...new Set(accounts.map((a) => a.institution))].sort((a, b) =>
-    a.localeCompare(b),
-  );
+  // Group on the EFFECTIVE institution (shared helper) so a renamed bank
+  // groups under its custom label — never the raw synced `institution`.
+  const institutions = [
+    ...new Set(accounts.map((a) => effectiveInstitution(a))),
+  ].sort((a, b) => a.localeCompare(b));
   const byInstitution: SummaryInstitutionGroup[] = institutions.map((institution) => {
-    const group = accounts.filter((a) => a.institution === institution);
+    const group = accounts.filter((a) => effectiveInstitution(a) === institution);
     const totalMinor = addMinor(0, ...group.filter(isBaseCurrency).map(contributionOf));
     return {
       institution,

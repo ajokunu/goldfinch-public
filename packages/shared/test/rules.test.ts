@@ -8,6 +8,7 @@ import {
   RuleMatchError,
   compareRulePrecedence,
   findMatchingRule,
+  ruleMarksTransfer,
   ruleMatches,
   type RuleSpec,
 } from '../src/rules.js';
@@ -184,6 +185,58 @@ describe('compareRulePrecedence / findMatchingRule', () => {
     assert.ok(compareRulePrecedence(a, b) < 0);
     assert.ok(compareRulePrecedence(b, a) > 0);
     assert.equal(compareRulePrecedence(a, { ...a }), 0);
+  });
+});
+
+describe('ruleMarksTransfer (transfer-detection action)', () => {
+  it('reflects markTransfer true / false / absent', () => {
+    assert.equal(ruleMarksTransfer(rule({ ruleId: 'r', markTransfer: true })), true);
+    assert.equal(ruleMarksTransfer(rule({ ruleId: 'r', markTransfer: false })), false);
+    // Absent == false (back-compat: pre-transfer-rule writers never set it).
+    assert.equal(ruleMarksTransfer(rule({ ruleId: 'r' })), false);
+  });
+
+  it('is an ACTION, not a match condition — matching is unaffected', () => {
+    // A markTransfer rule matches and wins exactly like an ordinary one.
+    const marking = rule({
+      ruleId: 'cc-payoff',
+      matchType: 'exact',
+      pattern: 'blue bottle coffee',
+      categoryId: 'transfers',
+      markTransfer: true,
+    });
+    assert.equal(ruleMatches(marking, input), true);
+    assert.equal(findMatchingRule([marking], input)?.ruleId, 'cc-payoff');
+  });
+
+  it('does not alter precedence ordering', () => {
+    // Same pattern/priority, one marks transfer: precedence must be identical
+    // (ties break on pattern length then ruleId, never on markTransfer).
+    const plain = rule({ ruleId: 'same-id', pattern: 'coffee' });
+    const marking = rule({ ruleId: 'same-id', pattern: 'coffee', markTransfer: true });
+    assert.equal(compareRulePrecedence(plain, marking), 0);
+    // Across a real ruleId difference the order is the SAME with or without the
+    // flag — markTransfer is invisible to compareRulePrecedence.
+    const a = rule({ ruleId: 'a', pattern: 'coffee' });
+    const b = rule({ ruleId: 'b', pattern: 'coffee', markTransfer: true });
+    assert.equal(compareRulePrecedence(a, b), -1);
+    assert.equal(compareRulePrecedence(b, a), 1);
+  });
+
+  it('a markTransfer rule still wins the contest by normal precedence', () => {
+    const rules: RuleSpec[] = [
+      rule({ ruleId: 'contains', pattern: 'coffee', priority: 1 }),
+      rule({
+        ruleId: 'exact',
+        matchType: 'exact',
+        pattern: 'blue bottle coffee',
+        markTransfer: true,
+        priority: 999,
+      }),
+    ];
+    const winner = findMatchingRule(rules, input);
+    assert.equal(winner?.ruleId, 'exact');
+    assert.equal(ruleMarksTransfer(winner as RuleSpec), true);
   });
 });
 

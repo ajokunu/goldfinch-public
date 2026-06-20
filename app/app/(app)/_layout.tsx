@@ -2,17 +2,19 @@
  * Authenticated shell navigation -- Phase 7 information architecture, shell
  * restyle per ops/design-spec/shell.md (decisions 2/4).
  *
- * Nine destinations would overflow a tab bar, so the IA is five tabs with a
- * More section for the low-frequency management screens. Tab labels are the
- * prototype set (shell.md 1.1, decision 4) and are localized via src/i18n
- * useT(); `title` stays the English label for web document titles. Routes
- * are unchanged:
+ * The IA is six primary tabs plus a More section for the low-frequency
+ * management screens. Tab labels are the prototype set (shell.md 1.1,
+ * decision 4) plus the Investments aggregate tab (P7-3 top-level holdings
+ * view) and are localized via src/i18n useT(); `title` stays the English
+ * label for web document titles. Routes are unchanged except the added
+ * Investments destination:
  *
  *   Tab 1 Home          /                      features/dashboard
  *   Tab 2 Activity      /transactions          features/transactions
  *   Tab 3 Budget        /budget                features/budget
- *   Tab 4 Reports       /reports               features/reports (P7-4)
- *   Tab 5 More          /more                  shell-owned hub stack:
+ *   Tab 4 Investments   /investments           features/investments (P7-3)
+ *   Tab 5 Reports       /reports               features/reports (P7-4)
+ *   Tab 6 More          /more                  shell-owned hub stack:
  *           Goals       /more/goals            features/goals (P7-2)
  *           Recurring   /more/recurring        features/recurring (P7-1)
  *           Rules       /more/rules            features/rules (P7-5)
@@ -38,9 +40,11 @@
  *   sides of the breakpoint; content is centered at max-width 1040 (shell.md
  *   4.3).
  *
- * Icons are lucide-react-native (house no-emoji rule); `transactions` is
- * ArrowDownUp per the prototype glyph (shell.md 1.1). The same tree serves
- * native tabs and web URLs.
+ * Icons are lucide-react-native chrome (house no-emoji rule); `transactions`
+ * is ArrowDownUp per the prototype glyph (shell.md 1.1). The Investments tab
+ * is the one identity destination, so its glyph is the phosphor duotone
+ * ChartLineUpIcon from src/ui/icons (per the house icon rule), not lucide.
+ * The same tree serves native tabs and web URLs.
  */
 import { useCallback, useState } from 'react';
 import {
@@ -60,6 +64,7 @@ import {
 } from 'lucide-react-native';
 
 import { useT } from '../../src/i18n';
+import { ChartLineUpIcon } from '../../src/ui/icons';
 import { SheetHost } from '../../src/ui/SheetHost';
 import { useTabTransition } from '../../src/ui/motion';
 import { useTheme } from '../../src/ui/ThemeProvider';
@@ -67,6 +72,7 @@ import { AddFab } from '../../src/ui/shell/AddFab';
 import { isFabPathname } from '../../src/ui/shell/navActive';
 import { Sidebar } from '../../src/ui/shell/Sidebar';
 import { TabBar } from '../../src/ui/shell/TabBar';
+import { useWidgetSync } from '../../features/widget/useWidgetSync';
 
 /** Desktop sidebar breakpoint (shell.md 4.1, decision 4). */
 const DESKTOP_MIN_WIDTH = 1024;
@@ -88,6 +94,12 @@ export default function AppTabsLayout() {
   // navigator serves the desktop sidebar, so sidebar content switches get
   // the identical crossfade.
   const tabTransition = useTabTransition();
+
+  // Keep the home-screen widget's cached weekly-spend snapshot fresh: rebuilds
+  // and writes it on app foreground and after each sync. No-op on web and when
+  // the native widget bridge is absent. Mounted in the authed shell so it only
+  // runs for a signed-in household.
+  useWidgetSync();
 
   // The custom bar reports its laid-out height so the FAB clears it exactly
   // (insets included) without @react-navigation/bottom-tabs context hooks.
@@ -151,6 +163,22 @@ export default function AppTabsLayout() {
                       color={color}
                       size={23}
                       strokeWidth={focused ? 2.4 : 2}
+                    />
+                  ),
+                }}
+              />
+              <Tabs.Screen
+                name="investments"
+                options={{
+                  title: 'Investments',
+                  tabBarLabel: t('Investments'),
+                  // Identity glyph: phosphor duotone (house rule), so this
+                  // tab takes weight/size/color -- NOT lucide's strokeWidth.
+                  tabBarIcon: ({ color, focused }) => (
+                    <ChartLineUpIcon
+                      color={color}
+                      size={23}
+                      weight={focused ? 'fill' : 'duotone'}
                     />
                   ),
                 }}

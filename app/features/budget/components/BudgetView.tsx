@@ -11,8 +11,9 @@
  * degrades to Budgeted + Spent -- never a blank or invented income.
  */
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ChartPie, Plus, Tag } from 'lucide-react-native';
+import { stepWeek } from '@goldfinch/shared/periodWindow';
 import type {
   BudgetDto,
   BudgetPeriod,
@@ -38,7 +39,17 @@ import { useTheme } from '../../../src/ui/ThemeProvider';
 import { groupLabel, UNGROUPED_KEY } from '../lib/grouping';
 import { colorForCategory } from '../lib/colors';
 import { currentIsoMonth, isoMonthLabel } from '../../../src/lib/dates';
-import { useBudgetsQuery, useCashflowQuery, useCategoriesQuery } from '../hooks/useBudgetQueries';
+import {
+  BUDGET_DATE_RANGE_PRESETS,
+  resolveBudgetDateRange,
+  type DateRangePresetId,
+} from '../../../src/lib/dateRangePresets';
+import {
+  useBudgetsQuery,
+  useBudgetsRangeQuery,
+  useCashflowQuery,
+  useCategoriesQuery,
+} from '../hooks/useBudgetQueries';
 import {
   BUDGET_PERIOD_EMPTY,
   BUDGET_PERIOD_KEYS,
@@ -54,6 +65,8 @@ import {
   CategoryTransactionsModal,
   type CategoryTransactionsTarget,
 } from './CategoryTransactionsModal';
+import { RangeChooserSheet } from './RangeChooserSheet';
+import { WeekStepper } from './WeekStepper';
 import { ErrorState, LoadingState } from '../../../src/ui/States';
 
 interface BudgetRowData {
@@ -115,15 +128,21 @@ function buildSections(
   return sections;
 }
 
-export function BudgetView() {
+export interface BudgetViewProps {
+  /**
+   * Injectable "now" for the week/range window derivation (tests). All NEW
+   * window math (stepWeek, resolveBudgetDateRange) anchors on this; the existing
+   * default-mode month label/cashflow path is unchanged.
+   */
+  now?: Date;
+}
+
+export function BudgetView({ now }: BudgetViewProps = {}) {
   const theme = useTheme();
   const t = useT();
   const lang = useLang();
   const month = currentIsoMonth();
-
-  const categoriesQuery = useCategoriesQuery();
-  const budgetsQuery = useBudgetsQuery();
-  const cashflowQuery = useCashflowQuery(month, month);
+  const anchor = now ?? new Date();
 
   const [editorTarget, setEditorTarget] = useState<BudgetEditorTarget | null>(null);
   const [txnTarget, setTxnTarget] = useState<CategoryTransactionsTarget | null>(null);
@@ -131,6 +150,35 @@ export function BudgetView() {
   // P11-4: the Week/Month/Year tabs FILTER the list to budgets of the selected
   // cadence (per-budget-period model). Default Month, the pre-Phase-11 cadence.
   const [periodTab, setPeriodTab] = useState<BudgetPeriod>(DEFAULT_BUDGET_PERIOD);
+  // Budget-range feature: the context-sensitive date header above the cadence
+  // tabs. Week tab => a whole-week offset (0 = current week); Month/Year tab =>
+  // a date-range preset (null = default current-period view).
+  const [weekDelta, setWeekDelta] = useState(0);
+  const [rangePreset, setRangePreset] = useState<DateRangePresetId | null>(null);
+  const [rangeSheetOpen, setRangeSheetOpen] = useState(false);
+
+  // The active scope window, and whether it departs from the default current
+  // period. Week tab: any non-zero step is a range; delta 0 is the current week
+  // the default query already covers. Month/Year tab: any selected preset is a
+  // range. All window math goes through the shared periodWindow/stepWeek and the
+  // ET preset resolvers -- never app/src/lib/dates.ts local math.
+  const activeWindow =
+    periodTab === 'weekly'
+      ? stepWeek(anchor, weekDelta)
+      : rangePreset !== null
+        ? resolveBudgetDateRange(rangePreset, anchor)
+        : null;
+  const rangeActive =
+    periodTab === 'weekly' ? weekDelta !== 0 : rangePreset !== null;
+
+  const categoriesQuery = useCategoriesQuery();
+  const budgetsQuery = useBudgetsQuery();
+  const rangeQuery = useBudgetsRangeQuery(
+    activeWindow?.from ?? '',
+    activeWindow?.to ?? '',
+    rangeActive && activeWindow !== null,
+  );
+  const cashflowQuery = useCashflowQuery(month, month);
 
   const currency: CurrencyCode = cashflowQuery.data?.currency ?? 'USD';
   const monthCashflow = cashflowQuery.data?.months.find((m) => m.month === month);
@@ -139,9 +187,13 @@ export function BudgetView() {
     () => categoriesQuery.data?.items ?? [],
     [categoriesQuery.data],
   );
+  // In range mode the rows + per-row prorated targets ride the range query
+  // (limitMinor carries the prorated target server-side); otherwise the default
+  // current-period query.
   const budgets = useMemo(
-    () => budgetsQuery.data?.items ?? [],
-    [budgetsQuery.data],
+    () =>
+      (rangeActive ? rangeQuery.data?.items : budgetsQuery.data?.items) ?? [],
+    [rangeActive, rangeQuery.data, budgetsQuery.data],
   );
 
   // P11-4: only the budgets whose own cadence matches the selected tab. Each
@@ -182,15 +234,19 @@ export function BudgetView() {
     [visibleBudgets],
   );
 
-  const isPending = budgetsQuery.isPending || categoriesQuery.isPending;
-  const isError = budgetsQuery.isError || categoriesQuery.isError;
+  // The budgets query that backs the current view: the range query in range
+  // mode, the default current-period query otherwise.
+  const activeBudgetsQuery = rangeActive ? rangeQuery : budgetsQuery;
+
+  const isPending = activeBudgetsQuery.isPending || categoriesQuery.isPending;
+  const isError = activeBudgetsQuery.isError || categoriesQuery.isError;
   const refreshing =
-    budgetsQuery.isRefetching ||
+    activeBudgetsQuery.isRefetching ||
     categoriesQuery.isRefetching ||
     cashflowQuery.isRefetching;
 
   const refetchAll = () => {
-    void budgetsQuery.refetch();
+    void activeBudgetsQuery.refetch();
     void categoriesQuery.refetch();
     void cashflowQuery.refetch();
   };
@@ -217,7 +273,11 @@ export function BudgetView() {
   // the cashflow income figure is a per-MONTH number, so comparing it to a
   // weekly or yearly budgeted total would be apples to oranges. On the Week /
   // Year tabs the strip degrades to Budgeted | Spent (both for that cadence).
+  // Section 9.3 A: in range mode the strip degrades to Budgeted | Spent (the
+  // cashflow income figure is a current-month number that cannot be compared to
+  // an arbitrary range), reusing the existing degrade path.
   const hasIncome =
+    !rangeActive &&
     periodTab === 'monthly' &&
     monthCashflow !== undefined &&
     !cashflowQuery.isError;
@@ -252,6 +312,17 @@ export function BudgetView() {
     label: t(BUDGET_PERIOD_KEYS[period]),
   }));
 
+  // Month/Year header label: the selected preset's name when range mode is
+  // active, else the current-month caption (now a tap target that opens the
+  // range chooser). The Week tab renders the WeekStepper instead of this label.
+  const activePresetLabel = BUDGET_DATE_RANGE_PRESETS.find(
+    (p) => p.id === rangePreset,
+  )?.label;
+  const monthHeaderLabel =
+    activePresetLabel !== undefined
+      ? t(activePresetLabel)
+      : isoMonthLabel(month, localeTag(lang));
+
   return (
     <>
       <ScrollView
@@ -266,23 +337,41 @@ export function BudgetView() {
           />
         }
       >
-        {/* Static month caption (3.2): GET /budgets has no month param, so
-            this is a period label, not dead navigation. Entrance cascade via
-            the shared motion module (PHASE9-DECISIONS P9-1/P9-2 item 1). */}
+        {/* Context-sensitive date header (budget-range feature, Decision 5):
+            Week tab => a prev/next week stepper; Month/Year tab => a tappable
+            label that opens the date-range chooser. Entrance cascade via the
+            shared motion module (PHASE9-DECISIONS P9-1/P9-2 item 1). */}
         <FadeRise>
-          <Text
-            style={[
-              styles.monthCaption,
-              {
-                color: theme.colors.textPrimary,
-                fontFamily: theme.fonts.display,
-                fontWeight: theme.fonts.displayWeight,
-                marginBottom: 12,
-              },
-            ]}
-          >
-            {isoMonthLabel(month, localeTag(lang))}
-          </Text>
+          <View style={{ marginBottom: 12 }}>
+            {periodTab === 'weekly' ? (
+              <WeekStepper
+                weekDelta={weekDelta}
+                onChange={setWeekDelta}
+                now={anchor}
+              />
+            ) : (
+              <Pressable
+                onPress={() => setRangeSheetOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel={`${monthHeaderLabel}, change date range`}
+                hitSlop={theme.spacing.sm}
+                style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+              >
+                <Text
+                  style={[
+                    styles.monthCaption,
+                    {
+                      color: theme.colors.textPrimary,
+                      fontFamily: theme.fonts.display,
+                      fontWeight: theme.fonts.displayWeight,
+                    },
+                  ]}
+                >
+                  {monthHeaderLabel}
+                </Text>
+              </Pressable>
+            )}
+          </View>
 
           {/* Summary strip: Income | Budgeted | Left (degraded: Budgeted |
               Spent when the cashflow read failed or is empty). */}
@@ -478,11 +567,24 @@ export function BudgetView() {
         target={editorTarget}
         onClose={() => setEditorTarget(null)}
       />
+      {/* Section 9.3 C: in range mode the drill-down opens the category's
+          transactions for the SAME [from,to] the row's spend was computed over;
+          otherwise the current month. */}
       <CategoryTransactionsModal
         target={txnTarget}
         month={month}
+        range={rangeActive ? activeWindow : undefined}
         currency={currency}
         onClose={() => setTxnTarget(null)}
+      />
+      <RangeChooserSheet
+        visible={rangeSheetOpen}
+        preset={rangePreset}
+        onPresetChange={(preset) => {
+          setRangePreset(preset);
+          setRangeSheetOpen(false);
+        }}
+        onClose={() => setRangeSheetOpen(false)}
       />
       {/* Designed empty state's create flow: pick a category, then open the
           existing editor in create mode. */}

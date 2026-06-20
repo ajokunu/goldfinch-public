@@ -94,6 +94,13 @@ export const API_ROUTES = {
   createGoalContribution: 'POST /goals/{goalId}/contributions',
   // P7-3 investment holdings
   listAccountHoldings: 'GET /accounts/{accountId}/holdings',
+  // Investments enrichment (Part A): set/clear the USER-OWNED manual TOTAL cost
+  // basis for a position. POST (not PUT — CORS lacks PUT); null/empty amount
+  // clears. Adding this key auto-registers the JWT-gated gateway route.
+  setHoldingCostBasis: 'POST /accounts/{accountId}/holdings/{symbol}/cost-basis',
+  // Investments chart: daily price-per-share history for one position (read-only;
+  // sync writes the snapshots). Client normalizes to a % return series.
+  holdingPriceHistory: 'GET /accounts/{accountId}/holdings/{symbol}/price-history',
   // P7-4 reports + net-worth history
   netWorthHistory: 'GET /networth/history',
   reportsTrends: 'GET /reports/trends',

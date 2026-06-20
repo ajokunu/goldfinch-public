@@ -14,7 +14,17 @@ import {
   useQueryClient,
   type QueryClient,
 } from '@tanstack/react-query';
-import { ACCOUNT_TYPES } from '@goldfinch/shared/accountTypes';
+import {
+  ACCOUNT_TYPES,
+  effectiveAccountName,
+  effectiveInstitution,
+} from '@goldfinch/shared/accountTypes';
+import {
+  effectiveCostBasisMinor,
+  holdingGainMinor,
+  holdingPercentReturn,
+} from '@goldfinch/shared/holdingBasis';
+import { parseCurrencyAmount, toCurrencyDecimalString } from '@goldfinch/shared/money';
 import type {
   AccountDto,
   ApplyRuleRequest,
@@ -23,12 +33,15 @@ import type {
   CreateGoalContributionRequest,
   CreateGoalRequest,
   CreateRuleRequest,
+  HoldingDto,
   ImportTransactionsRequest,
   ListAccountsResponse,
+  ListHoldingsResponse,
   PatchAccountRequest,
   PatchGoalRequest,
   PatchRecurringRequest,
   PatchRuleRequest,
+  SetHoldingCostBasisRequest,
 } from '@goldfinch/shared/types';
 
 import { logger } from '../lib/logger';
@@ -47,6 +60,7 @@ import {
   patchGoal,
   patchRecurring,
   patchRule,
+  setHoldingCostBasis,
 } from './endpoints';
 import { queryKeys } from './queryKeys';
 
@@ -76,10 +90,33 @@ function spendViewKeys(): ReadonlyArray<readonly unknown[]> {
 // ---------------------------------------------------------------------------
 
 /**
+ * Projects ONE override field of the PATCH body (nameOverride /
+ * institutionOverride) onto a cached AccountDto. The wire semantics are:
+ * undefined leaves it unchanged; null OR an empty/whitespace string CLEARS the
+ * override (the effective value reverts to the synced one); a non-empty string
+ * SETS the trimmed override. The effective display value is recomputed through
+ * the shared precedence helper so the optimistic window can never disagree with
+ * the rule the server applies.
+ */
+function projectOverride(
+  patch: string | null | undefined,
+  current: { effective: string; synced: string; override?: string },
+  effective: (item: { value: string; override?: string }) => string,
+): { value: string; override?: string } {
+  if (patch === undefined) {
+    return { value: current.effective, override: current.override };
+  }
+  const trimmed = typeof patch === 'string' ? patch.trim() : '';
+  const override = trimmed.length > 0 ? trimmed : undefined;
+  return { value: effective({ value: current.synced, override }), override };
+}
+
+/**
  * Optimistic projection of a PATCH body onto a cached AccountDto. The
  * effective values mirror the shared precedence for the optimistic window
  * only (an explicit isLiability wins; otherwise a type change falls to the
- * new type's metadata default). The server response -- computed through the
+ * new type's metadata default; a label/institution override falls back to the
+ * synced value when cleared). The server response -- computed through the
  * shared helpers, including any pre-existing liability override the client
  * cannot see -- is authoritative and replaces this projection on success.
  */
@@ -93,7 +130,37 @@ function applyAccountPatch(
     (body.accountType !== undefined
       ? ACCOUNT_TYPES[body.accountType].isLiabilityDefault
       : account.isLiability);
-  return { ...account, accountTypeId, isLiability };
+  const name = projectOverride(
+    body.nameOverride,
+    {
+      effective: account.name,
+      synced: account.syncedName,
+      override: account.nameOverride,
+    },
+    (item) => effectiveAccountName({ name: item.value, nameOverride: item.override }),
+  );
+  const institution = projectOverride(
+    body.institutionOverride,
+    {
+      effective: account.institution,
+      synced: account.syncedInstitution,
+      override: account.institutionOverride,
+    },
+    (item) =>
+      effectiveInstitution({
+        institution: item.value,
+        institutionOverride: item.override,
+      }),
+  );
+  return {
+    ...account,
+    accountTypeId,
+    isLiability,
+    name: name.value,
+    nameOverride: name.override,
+    institution: institution.value,
+    institutionOverride: institution.override,
+  };
 }
 
 interface PatchAccountContext {
@@ -175,6 +242,147 @@ export function usePatchAccount() {
       ]);
     },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Holdings cost basis (Investments enrichment, Part A) --
+// POST /accounts/{accountId}/holdings/{symbol}/cost-basis
+// ---------------------------------------------------------------------------
+
+/**
+ * Optimistic projection of a manual cost-basis set/clear onto ONE cached
+ * HoldingDto, re-deriving the effective basis + source and the gain/percent
+ * THROUGH THE SHARED HELPERS (never inline) so the optimistic window cannot
+ * disagree with the value the server computes through the same helpers.
+ *
+ * - `manualCostBasisMinor === undefined` clears the manual override; the row
+ *   falls back to the feed basis (non-zero) or the em-dash, per the precedence.
+ * - The feed value the server matched is reconstructed from the current
+ *   `costBasisSource`/`costBasisMinor`: a 'feed' source means the cached
+ *   `costBasisMinor` IS the feed value, so it stays the fallback after a clear.
+ */
+function projectHoldingCostBasis(
+  holding: HoldingDto,
+  manualCostBasisMinor: number | undefined,
+): HoldingDto {
+  const feedCostBasisMinor =
+    holding.costBasisSource === 'feed' ? holding.costBasisMinor : undefined;
+  const effective = effectiveCostBasisMinor(
+    { manualCostBasisMinor, feedCostBasisMinor },
+    log,
+  );
+  if (effective === undefined) {
+    // No basis -> strip every basis-derived field so the row shows a dash.
+    const {
+      costBasis: _cb,
+      costBasisMinor: _cbm,
+      costBasisSource: _cbs,
+      gain: _g,
+      gainMinor: _gm,
+      percentReturn: _pr,
+      ...rest
+    } = holding;
+    return rest;
+  }
+  const gainMinor = holdingGainMinor(holding.marketValueMinor, effective.costBasisMinor);
+  return {
+    ...holding,
+    costBasis: toCurrencyDecimalString(effective.costBasisMinor, holding.currency),
+    costBasisMinor: effective.costBasisMinor,
+    costBasisSource: effective.source,
+    gain: toCurrencyDecimalString(gainMinor, holding.currency),
+    gainMinor,
+    percentReturn: holdingPercentReturn(gainMinor, effective.costBasisMinor),
+  };
+}
+
+interface SetHoldingCostBasisVars {
+  accountId: string;
+  symbol: string;
+  body: SetHoldingCostBasisRequest;
+}
+
+interface SetHoldingCostBasisContext {
+  previous: ListHoldingsResponse | undefined;
+}
+
+/**
+ * POST .../cost-basis with an optimistic cache edit on
+ * holdings.byAccount(accountId): the matching position flips to the projected
+ * gain/percent immediately (recomputed through the shared helpers), rolls back
+ * on ANY error, and converges on the server's authoritative list on success.
+ *
+ * `amount` is the decimal string the user typed; null (or an empty/whitespace
+ * string) CLEARS the basis. The optimistic minor-unit value is parsed via the
+ * shared parseCurrencyAmount against the holding's currency; a malformed draft
+ * (which the server would reject) skips the optimistic projection but is still
+ * sent so the server's 400 surfaces normally.
+ */
+export function useSetHoldingCostBasis() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: SetHoldingCostBasisVars) =>
+      setHoldingCostBasis(vars.accountId, vars.symbol, vars.body),
+    onMutate: async (vars): Promise<SetHoldingCostBasisContext> => {
+      const key = queryKeys.holdings.byAccount(vars.accountId);
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<ListHoldingsResponse>(key);
+      if (previous !== undefined) {
+        const next = previous.items.map((holding) => {
+          if (holding.symbol !== vars.symbol) return holding;
+          const manualCostBasisMinor = parseOptimisticAmount(
+            vars.body.amount,
+            holding.currency,
+          );
+          return projectHoldingCostBasis(holding, manualCostBasisMinor);
+        });
+        queryClient.setQueryData<ListHoldingsResponse>(key, {
+          ...previous,
+          items: next,
+        });
+      }
+      return { previous };
+    },
+    onError: (error, vars, context) => {
+      log.warn('holding cost-basis POST failed; rolling back optimistic edit', {
+        accountId: vars.accountId,
+        symbol: vars.symbol,
+        error,
+      });
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(
+          queryKeys.holdings.byAccount(vars.accountId),
+          context.previous,
+        );
+      }
+      invalidate(queryClient, [queryKeys.holdings.byAccount(vars.accountId)]);
+    },
+    onSuccess: (response, vars) => {
+      queryClient.setQueryData(
+        queryKeys.holdings.byAccount(vars.accountId),
+        response,
+      );
+    },
+  });
+}
+
+/**
+ * Parse the typed decimal string into the optimistic manual minor-unit value:
+ * null / empty / whitespace -> undefined (clear). A parse failure also yields
+ * undefined so the projection is skipped (the server validates and 400s).
+ */
+function parseOptimisticAmount(
+  amount: string | null,
+  currency: HoldingDto['currency'],
+): number | undefined {
+  if (amount === null) return undefined;
+  const trimmed = amount.trim();
+  if (trimmed.length === 0) return undefined;
+  try {
+    return parseCurrencyAmount(trimmed, currency);
+  } catch {
+    return undefined;
+  }
 }
 
 // ---------------------------------------------------------------------------

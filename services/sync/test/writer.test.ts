@@ -91,7 +91,12 @@ describe('buildAccountFieldUpdate (P8-4)', () => {
   });
 
   it('locks the user-owned account field list to the P8-4 contract', () => {
-    expect([...ACCOUNT_USER_OWNED_FIELDS]).toEqual(['typeOverride', 'isLiabilityOverride']);
+    expect([...ACCOUNT_USER_OWNED_FIELDS]).toEqual([
+      'typeOverride',
+      'isLiabilityOverride',
+      'nameOverride',
+      'institutionOverride',
+    ]);
   });
 
   it('REMOVEs removable optional fields the institution stopped sending, never holdingsSupported', () => {
@@ -179,6 +184,32 @@ describe('upsertSyncItems', () => {
     expect(row?.accountType).toBe('other'); // synced type still sync-owned
   });
 
+  it('preserves nameOverride/institutionOverride through a sync refresh (overrides are user-owned)', async () => {
+    const ddb = new FakeDdb();
+    await upsertSyncItems(normalizeForSync(baseAccountSet(), CTX), options(ddb));
+
+    // Simulate PATCH /accounts/{accountId}: the user relabels checking.
+    ddb.putItem({
+      ...ddb.getItem(PK, 'ACCT#ACT-checking-1'),
+      nameOverride: 'Joint Checking',
+      institutionOverride: 'My Bank',
+    });
+
+    // Next sync run arrives with the institution renaming the account.
+    const refreshed = baseAccountSet();
+    refreshed.accounts[0]!.name = 'Premium Checking';
+    refreshed.accounts[0]!.org.name = 'Example Bank, N.A.';
+    await upsertSyncItems(normalizeForSync(refreshed, CTX), options(ddb));
+
+    const row = ddb.getItem(PK, 'ACCT#ACT-checking-1');
+    // User-owned overrides survive untouched...
+    expect(row?.nameOverride).toBe('Joint Checking');
+    expect(row?.institutionOverride).toBe('My Bank');
+    // ...while the synced name/institution refresh underneath.
+    expect(row?.name).toBe('Premium Checking');
+    expect(row?.institution).toBe('Example Bank, N.A.');
+  });
+
   it('preserves account overrides even when the PATCH lands mid-run', async () => {
     const ddb = new FakeDdb();
     await upsertSyncItems(normalizeForSync(baseAccountSet(), CTX), options(ddb));
@@ -249,7 +280,7 @@ describe('upsertSyncItems', () => {
         categoryId: 'groceries',
         categorizedBy: 'user',
         userCategorized: true,
-        lastEditedBy: 'sub-aaron',
+        lastEditedBy: 'sub-alex',
         note: 'Weekly shop',
         noteLower: 'weekly shop',
         GSI2PK: gsi2Pk(HOUSEHOLD, 'groceries'),
@@ -268,7 +299,7 @@ describe('upsertSyncItems', () => {
     expect(row?.categoryId).toBe('groceries');
     expect(row?.userCategorized).toBe(true);
     expect(row?.categorizedBy).toBe('user');
-    expect(row?.lastEditedBy).toBe('sub-aaron');
+    expect(row?.lastEditedBy).toBe('sub-alex');
     expect(row?.note).toBe('Weekly shop');
     expect(row?.noteLower).toBe('weekly shop');
     expect(row?.GSI2PK).toBe(gsi2Pk(HOUSEHOLD, 'groceries'));
@@ -336,9 +367,9 @@ describe('upsertSyncItems', () => {
       categoryId: 'coffee',
       categorizedBy: 'user',
       userCategorized: true,
-      lastEditedBy: 'sub-aaron',
-      note: 'Latte with Dami',
-      noteLower: 'latte with dami',
+      lastEditedBy: 'sub-alex',
+      note: 'Latte with Taylor',
+      noteLower: 'latte with taylor',
       GSI2PK: gsi2Pk(HOUSEHOLD, 'coffee'),
       GSI2SK: gsi2Sk('2026-06-09', 'TXN-nodate-1'),
       version: 5,
@@ -368,9 +399,9 @@ describe('upsertSyncItems', () => {
     expect(moved?.postedDate).toBe('2026-06-11');
     expect(moved?.categoryId).toBe('coffee');
     expect(moved?.userCategorized).toBe(true);
-    expect(moved?.lastEditedBy).toBe('sub-aaron');
-    expect(moved?.note).toBe('Latte with Dami');
-    expect(moved?.noteLower).toBe('latte with dami');
+    expect(moved?.lastEditedBy).toBe('sub-alex');
+    expect(moved?.note).toBe('Latte with Taylor');
+    expect(moved?.noteLower).toBe('latte with taylor');
     expect(moved?.GSI2PK).toBe(gsi2Pk(HOUSEHOLD, 'coffee'));
     expect(moved?.GSI2SK).toBe(gsi2Sk('2026-06-11', 'TXN-nodate-1'));
     expect(moved?.version).toBe(6);

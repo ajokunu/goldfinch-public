@@ -16,6 +16,8 @@
  *   @goldfinch/shared/logger     structured JSON logger + EMF metrics (P7-10)
  *   @goldfinch/shared/accountTypes account-type metadata + effective-value
  *                                precedence helpers (P8-4)
+ *   @goldfinch/shared/holdingBasis effective cost-basis precedence + signed
+ *                                gain / percent-return BigInt math (Investments)
  *   @goldfinch/shared/categoryStyle category color-key + glyph-key contract +
  *                                color precedence helper (P10-1/P10-2/P10-4)
  *   @goldfinch/shared/periodWindow current weekly/monthly/yearly budget window
@@ -33,6 +35,8 @@ export * from './constants.js';
 export * from './recurrence.js';
 export * from './rules.js';
 export * from './budgetMath.js';
+export * from './holdingBasis.js';
+export * from './holdingReturn.js';
 export * from './csv.js';
 export * from './logger.js';
 export * from './accountTypes.js';

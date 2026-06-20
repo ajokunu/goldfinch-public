@@ -51,6 +51,14 @@
       "types": "./dist/budgetMath.d.ts",
       "import": "./dist/budgetMath.js"
     },
+    "./holdingBasis": {
+      "types": "./dist/holdingBasis.d.ts",
+      "import": "./dist/holdingBasis.js"
+    },
+    "./holdingReturn": {
+      "types": "./dist/holdingReturn.d.ts",
+      "import": "./dist/holdingReturn.js"
+    },
     "./csv": {
       "types": "./dist/csv.d.ts",
       "import": "./dist/csv.js"

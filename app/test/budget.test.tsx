@@ -8,14 +8,19 @@
 import { ActivityIndicator } from 'react-native';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 
+import { periodWindow, stepWeek } from '@goldfinch/shared/periodWindow';
+
 import BudgetScreen from '../features/budget';
+import { BudgetView } from '../features/budget/components/BudgetView';
 import { currentIsoMonth, isoMonthLabel } from '../src/lib/dates';
+import { resolveBudgetDateRange } from '../src/lib/dateRangePresets';
 import { formatMinorAmount } from '../src/ui/CurrencyAmount';
 import {
   listOf,
   makeBudgetDto,
   makeCashflowResponse,
   makeCategoryDto,
+  makeTransactionDto,
 } from './fixtures';
 import { mockApi } from './mockApi';
 import { renderWithProviders } from './render';
@@ -57,8 +62,13 @@ describe('Budget screen', () => {
     expect(screen.getByText('Cash flow')).toBeOnTheScreen();
     expect(screen.getByText('Categories')).toBeOnTheScreen();
 
-    // Current-month caption (static period label).
-    expect(await screen.findByText(isoMonthLabel(MONTH))).toBeOnTheScreen();
+    // Month-header line: now a tappable date control (budget-range feature),
+    // no longer a static Text. The current-month label is the button's label.
+    const header = await screen.findByRole('button', {
+      name: `${isoMonthLabel(MONTH)}, change date range`,
+    });
+    expect(header).toBeOnTheScreen();
+    expect(screen.getByText(isoMonthLabel(MONTH))).toBeOnTheScreen();
 
     // Summary strip: Income | Budgeted | Left, integer minor-unit derived.
     expect(await screen.findByText('Income')).toBeOnTheScreen();
@@ -255,5 +265,273 @@ describe('Budget screen', () => {
       expect(patchedBody).toBeDefined();
     });
     expect(patchedBody).toMatchObject({ period: 'weekly' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Budget-range feature: the context-sensitive date header (Decision 5).
+// Month/Year tab => a tappable label opening the presets range chooser;
+// Week tab => a ‹ › prev/next Mon..Sun stepper. Range mode re-queries
+// GET /budgets with from/to and renders rows + a degraded strip from it; the
+// drill-down covers the same range. `now` is injected for determinism.
+// ---------------------------------------------------------------------------
+
+describe('Budget range + week stepping', () => {
+  // Fixed ET-anchored instant so the resolved windows are deterministic.
+  const NOW = new Date('2026-06-15T12:00:00.000Z');
+
+  const groceriesCat = makeCategoryDto({ categoryId: 'groceries', name: 'Groceries' });
+  const rentCat = makeCategoryDto({ categoryId: 'rent', name: 'Rent' });
+
+  // Default (current-period) monthly budget vs the range-windowed variant the
+  // server returns when from/to are present (prorated target in limitMinor).
+  const monthlyDefault = makeBudgetDto({
+    categoryId: 'rent',
+    period: 'monthly',
+    limitMinor: 120_000,
+    spentMinor: 90_000,
+    categoryName: 'Rent',
+  });
+  const monthlyRanged = makeBudgetDto({
+    categoryId: 'rent',
+    period: 'monthly',
+    limitMinor: 80_000, // prorated target over the chosen range
+    spentMinor: 55_000, // range spend
+    categoryName: 'Rent',
+  });
+
+  const weeklyDefault = makeBudgetDto({
+    categoryId: 'groceries',
+    period: 'weekly',
+    limitMinor: 45_000,
+    spentMinor: 12_000,
+    categoryName: 'Groceries',
+  });
+  const weeklyStepped = makeBudgetDto({
+    categoryId: 'groceries',
+    period: 'weekly',
+    limitMinor: 45_000,
+    spentMinor: 30_000, // a different week's spend
+    categoryName: 'Groceries',
+  });
+
+  interface BudgetReq {
+    from: string | null;
+    to: string | null;
+  }
+
+  /** Registers /budgets so the default vs range request return distinct data. */
+  function mockBudgets(opts: {
+    categories: ReturnType<typeof makeCategoryDto>[];
+    defaultItems: ReturnType<typeof makeBudgetDto>[];
+    rangeItems: ReturnType<typeof makeBudgetDto>[];
+  }): { reqs: BudgetReq[] } {
+    const reqs: BudgetReq[] = [];
+    mockApi.get('/categories', listOf(opts.categories));
+    mockApi.get('/cashflow', cashflow);
+    mockApi.on('GET', '/budgets', (request) => {
+      const from = request.query.get('from');
+      const to = request.query.get('to');
+      reqs.push({ from, to });
+      return {
+        status: 200,
+        body: listOf(from ? opts.rangeItems : opts.defaultItems),
+      };
+    });
+    return { reqs };
+  }
+
+  it('Month-tab header tap opens the presets range chooser', async () => {
+    mockBudgets({
+      categories: [rentCat],
+      defaultItems: [monthlyDefault],
+      rangeItems: [monthlyRanged],
+    });
+
+    renderWithProviders(<BudgetView now={NOW} />);
+
+    fireEvent.press(
+      await screen.findByRole('button', {
+        name: `${isoMonthLabel(MONTH)}, change date range`,
+      }),
+    );
+
+    // Exactly the six signed-off presets, in order.
+    expect(await screen.findByText('Date range')).toBeOnTheScreen();
+    expect(screen.getByText('This month')).toBeOnTheScreen();
+    expect(screen.getByText('Last month')).toBeOnTheScreen();
+    expect(screen.getByText('Last 30 days')).toBeOnTheScreen();
+    expect(screen.getByText('Last 90 days')).toBeOnTheScreen();
+    expect(screen.getByText('This quarter')).toBeOnTheScreen();
+    expect(screen.getByText('Year to date')).toBeOnTheScreen();
+  });
+
+  it('selecting a preset re-queries with from/to and renders range data', async () => {
+    const { reqs } = mockBudgets({
+      categories: [rentCat],
+      defaultItems: [monthlyDefault],
+      rangeItems: [monthlyRanged],
+    });
+
+    renderWithProviders(<BudgetView now={NOW} />);
+
+    // Default mode first: the current-period limit + Income/Budgeted/Left strip.
+    expect(await screen.findByText('Rent')).toBeOnTheScreen();
+    expect(screen.getByText('Income')).toBeOnTheScreen();
+    expect(screen.getByText('Left')).toBeOnTheScreen();
+    expect(reqs[0]).toEqual({ from: null, to: null });
+
+    // Open the chooser and pick "Last month".
+    fireEvent.press(
+      screen.getByRole('button', {
+        name: `${isoMonthLabel(MONTH)}, change date range`,
+      }),
+    );
+    fireEvent.press(await screen.findByText('Last month'));
+
+    // The range request carries the ET-resolved Last-month window.
+    const lastMonth = resolveBudgetDateRange('lastMonth', NOW);
+    await waitFor(() =>
+      expect(reqs).toContainEqual({ from: lastMonth.from, to: lastMonth.to }),
+    );
+
+    // Rows re-render from the range data (prorated target + range spend).
+    expect(
+      await screen.findByText(
+        `${formatMinorAmount(55_000, 'USD')} / ${formatMinorAmount(80_000, 'USD')}`,
+      ),
+    ).toBeOnTheScreen();
+    // Header now reflects the selected preset.
+    expect(
+      screen.getByRole('button', { name: 'Last month, change date range' }),
+    ).toBeOnTheScreen();
+  });
+
+  it('range mode degrades the strip to Budgeted | Spent (no Income/Left)', async () => {
+    mockBudgets({
+      categories: [rentCat],
+      defaultItems: [monthlyDefault],
+      rangeItems: [monthlyRanged],
+    });
+
+    renderWithProviders(<BudgetView now={NOW} />);
+    await screen.findByText('Rent');
+
+    fireEvent.press(
+      screen.getByRole('button', {
+        name: `${isoMonthLabel(MONTH)}, change date range`,
+      }),
+    );
+    fireEvent.press(await screen.findByText('This quarter'));
+
+    // The Budgeted | Spent degrade path: Income and Left are gone.
+    expect(await screen.findByText('Spent')).toBeOnTheScreen();
+    expect(screen.getByText('Budgeted')).toBeOnTheScreen();
+    await waitFor(() => expect(screen.queryByText('Income')).toBeNull());
+    expect(screen.queryByText('Left')).toBeNull();
+  });
+
+  it('Week-tab header steps prev/next a Monday..Sunday window', async () => {
+    const { reqs } = mockBudgets({
+      categories: [groceriesCat],
+      defaultItems: [weeklyDefault],
+      rangeItems: [weeklyStepped],
+    });
+
+    renderWithProviders(<BudgetView now={NOW} />);
+
+    // Switch to the Week tab: the stepper replaces the month label, and the
+    // current week (delta 0) still uses the default per-cadence query.
+    fireEvent.press(await screen.findByText('Weekly'));
+    expect(await screen.findByLabelText('Previous week')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Next week')).toBeOnTheScreen();
+    expect(await screen.findByText('Groceries')).toBeOnTheScreen();
+
+    // Step to next week: the range request carries stepWeek(now, +1) Mon..Sun.
+    fireEvent.press(screen.getByLabelText('Next week'));
+    const nextWeek = stepWeek(NOW, 1);
+    await waitFor(() =>
+      expect(reqs).toContainEqual({ from: nextWeek.from, to: nextWeek.to }),
+    );
+
+    // Step back two: from next week to the previous week (delta -1).
+    fireEvent.press(screen.getByLabelText('Previous week'));
+    fireEvent.press(screen.getByLabelText('Previous week'));
+    const prevWeek = stepWeek(NOW, -1);
+    await waitFor(() =>
+      expect(reqs).toContainEqual({ from: prevWeek.from, to: prevWeek.to }),
+    );
+
+    // The stepper never opens the range chooser.
+    expect(screen.queryByText('Date range')).toBeNull();
+  });
+
+  it('does not open the range sheet while on the Week tab', async () => {
+    mockBudgets({
+      categories: [groceriesCat],
+      defaultItems: [weeklyDefault],
+      rangeItems: [weeklyStepped],
+    });
+
+    renderWithProviders(<BudgetView now={NOW} />);
+    fireEvent.press(await screen.findByText('Weekly'));
+
+    // No Month/Year header button exists on the Week tab.
+    expect(
+      screen.queryByRole('button', {
+        name: `${isoMonthLabel(MONTH)}, change date range`,
+      }),
+    ).toBeNull();
+  });
+
+  it('range-mode drill-down opens the full [from,to] range', async () => {
+    const rangeTxn = makeTransactionDto({
+      txnId: 'txn-range',
+      payee: 'Costco',
+      amountMinor: -55_000,
+      categoryId: 'rent',
+    });
+    const txnReqs: BudgetReq[] = [];
+
+    mockBudgets({
+      categories: [rentCat],
+      defaultItems: [monthlyDefault],
+      rangeItems: [monthlyRanged],
+    });
+    mockApi.on('GET', '/transactions', (request) => {
+      txnReqs.push({
+        from: request.query.get('from'),
+        to: request.query.get('to'),
+      });
+      return { status: 200, body: listOf([rangeTxn]) };
+    });
+
+    renderWithProviders(<BudgetView now={NOW} />);
+    await screen.findByText('Rent');
+
+    // Enter range mode via "This month".
+    fireEvent.press(
+      screen.getByRole('button', {
+        name: `${isoMonthLabel(MONTH)}, change date range`,
+      }),
+    );
+    fireEvent.press(await screen.findByText('This month'));
+
+    // Tap the row's spent/limit foot line to open the drill-down.
+    fireEvent.press(
+      await screen.findByText(
+        `${formatMinorAmount(55_000, 'USD')} / ${formatMinorAmount(80_000, 'USD')}`,
+      ),
+    );
+
+    // The drill-down lists transactions over the SAME range, not the month.
+    const thisMonth = resolveBudgetDateRange('thisMonth', NOW);
+    expect(await screen.findByText('Costco')).toBeOnTheScreen();
+    await waitFor(() =>
+      expect(txnReqs).toContainEqual({
+        from: thisMonth.from,
+        to: thisMonth.to,
+      }),
+    );
   });
 });

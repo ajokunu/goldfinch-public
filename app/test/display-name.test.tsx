@@ -23,12 +23,12 @@ afterEach(() => {
 
 describe('display-name change', () => {
   it('PATCHes /profile with the typed name and closes on success', async () => {
-    // Fresh user with no profile yet (Dami: GET 404 -> null name).
+    // Fresh user with no profile yet (Taylor: GET 404 -> null name).
     mockApi.error('GET', '/profile', 404, 'NOT_FOUND', 'no profile yet');
     let received: unknown = null;
     mockApi.on('PATCH', '/profile', (req) => {
       received = req.body;
-      return { status: 200, body: { displayName: 'Dami', email: 'd@x.com' } };
+      return { status: 200, body: { displayName: 'Taylor', email: 'd@x.com' } };
     });
 
     let closed = false;
@@ -41,10 +41,10 @@ describe('display-name change', () => {
       />,
     );
 
-    fireEvent.changeText(getByTestId('greeting-name-input'), 'Dami');
+    fireEvent.changeText(getByTestId('greeting-name-input'), 'Taylor');
     fireEvent.press(getByText('Save name'));
 
-    await waitFor(() => expect(received).toEqual({ displayName: 'Dami' }));
+    await waitFor(() => expect(received).toEqual({ displayName: 'Taylor' }));
     await waitFor(() => expect(closed).toBe(true));
   });
 
@@ -53,14 +53,14 @@ describe('display-name change', () => {
     let received: unknown = null;
     mockApi.on('PATCH', '/profile', (req) => {
       received = req.body;
-      return { status: 200, body: { displayName: 'Dami' } };
+      return { status: 200, body: { displayName: 'Taylor' } };
     });
     const { getByTestId, getByText } = renderWithProviders(
       <GreetingNameSheet visible onClose={() => {}} />,
     );
-    fireEvent.changeText(getByTestId('greeting-name-input'), '  Dami  ');
+    fireEvent.changeText(getByTestId('greeting-name-input'), '  Taylor  ');
     fireEvent.press(getByText('Save name'));
-    await waitFor(() => expect(received).toEqual({ displayName: 'Dami' }));
+    await waitFor(() => expect(received).toEqual({ displayName: 'Taylor' }));
   });
 
   it('surfaces an error and does not close when the API rejects', async () => {
@@ -76,7 +76,7 @@ describe('display-name change', () => {
         }}
       />,
     );
-    fireEvent.changeText(getByTestId('greeting-name-input'), 'Dami');
+    fireEvent.changeText(getByTestId('greeting-name-input'), 'Taylor');
     fireEvent.press(getByText('Save name'));
     await waitFor(() =>
       expect(getByText('Could not save your name')).toBeTruthy(),
