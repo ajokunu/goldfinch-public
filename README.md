@@ -19,8 +19,7 @@ It is **not** a hosted service and not multi-tenant — see "Single-household by
 
 ## Screenshots
 
-> Synthetic demo data (no real finances) — rendered from the app's Playwright
-> walkthrough against a fully mocked API.
+> Synthetic demo data (no real finances)
 
 | Dashboard | Budgets | Transactions | Reports |
 |---|---|---|---|
