@@ -55,7 +55,7 @@ import { fetchAccountsWithRetry } from './fetch-retry.js';
 import {
   applyHoldingsSupported,
   ingestHoldings,
-  loadHoldingsSupportFlags,
+  loadPriorAccountState,
 } from './holdings.js';
 import { emitSyncMetrics, type MetricsWriter, type SyncMetrics } from './metrics.js';
 import { writeNetWorthSnapshot } from './networth.js';
@@ -205,21 +205,30 @@ export function createHandler(deps: HandlerDeps = {}) {
         { fetchImpl: deps.fetchImpl, sleep: deps.sleep, logger },
       );
 
-      const normalized = normalizeForSync(accountSet, {
-        household: env.householdId,
-        now: nowDate,
-        accountTypes: env.accountTypes,
-      });
-      // P7-3: holdingsSupported is sticky ("ever returned a holdings array"),
-      // so prior flags are read first and merged onto the fresh items; the
-      // account writer then SETs the merged value (P8-4: attribute-scoped,
-      // never REMOVEs the flag, never touches the user-owned overrides).
-      const priorHoldingsFlags = await loadHoldingsSupportFlags(
+      // Prior per-account state (one begins_with Query over the ACCT# rows),
+      // read BEFORE normalize/upsert. Feeds two sticky behaviors from the same
+      // stored rows: (1) priorInvestmentIds so a transient empty/absent
+      // holdings payload no longer flips a known investment account to 'other'
+      // (which would also mis-sign that run's 401k contribution as spend), and
+      // (2) holdingsSupported -- sticky "ever returned a holdings array" --
+      // merged onto the fresh items so the account writer SETs the merged value
+      // (P8-4: attribute-scoped, never REMOVEs the flag, never touches overrides).
+      const priorAccountState = await loadPriorAccountState(
         ddb,
         env.tableName,
         env.householdId,
       );
-      applyHoldingsSupported(normalized.accounts, accountSet.accounts, priorHoldingsFlags);
+      const normalized = normalizeForSync(accountSet, {
+        household: env.householdId,
+        now: nowDate,
+        accountTypes: env.accountTypes,
+        priorInvestmentIds: priorAccountState.investmentIds,
+      });
+      applyHoldingsSupported(
+        normalized.accounts,
+        accountSet.accounts,
+        priorAccountState.holdingsSupported,
+      );
       logger.info('simplefin payload fetched', {
         accounts: normalized.accounts.length,
         transactions: normalized.transactions.length,

@@ -75,6 +75,10 @@
     "./periodWindow": {
       "types": "./dist/periodWindow.d.ts",
       "import": "./dist/periodWindow.js"
+    },
+    "./push": {
+      "types": "./dist/push.d.ts",
+      "import": "./dist/push.js"
     }
   },
   "files": [

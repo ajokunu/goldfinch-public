@@ -78,6 +78,44 @@ describe('normalizeForSync investment classification', () => {
     });
     expect(accounts[0]!.accountType).toBe('checking');
   });
+
+  it('stays investment when a transient empty-holdings payload arrives but the account was investment before', () => {
+    const { accounts } = normalizeForSync(setOf(account('ACT-401k', { holdings: [] })), {
+      household: HOUSEHOLD,
+      now: NOW,
+      priorInvestmentIds: new Set(['ACT-401k']),
+    });
+    expect(accounts[0]!.accountType).toBe('investment');
+    expect(accounts[0]!.isLiability).toBe(false);
+  });
+
+  it('stays investment when the holdings array is ABSENT but the account was investment before', () => {
+    const { accounts } = normalizeForSync(setOf(account('ACT-401k')), {
+      household: HOUSEHOLD,
+      now: NOW,
+      priorInvestmentIds: new Set(['ACT-401k']),
+    });
+    expect(accounts[0]!.accountType).toBe('investment');
+  });
+
+  it('NEGATIVE CONTROL: does NOT become investment for a bank/card sending holdings:[] when it was never investment', () => {
+    const { accounts } = normalizeForSync(setOf(account('ACT-bank', { holdings: [] })), {
+      household: HOUSEHOLD,
+      now: NOW,
+      priorInvestmentIds: new Set(),
+    });
+    expect(accounts[0]!.accountType).toBe('other');
+  });
+
+  it('lets ACCOUNT_TYPES_JSON still win over prior-investment stickiness', () => {
+    const { accounts } = normalizeForSync(setOf(account('ACT-x', { holdings: [] })), {
+      household: HOUSEHOLD,
+      now: NOW,
+      priorInvestmentIds: new Set(['ACT-x']),
+      accountTypes: { 'ACT-x': 'checking' },
+    });
+    expect(accounts[0]!.accountType).toBe('checking');
+  });
 });
 
 describe('normalizeForSync retirement contributions', () => {
@@ -125,5 +163,21 @@ describe('normalizeForSync retirement contributions', () => {
     const txn = transactions.find((t) => t.simplefinTxnId === 'TXN-div');
     expect(txn!.amountMinor).toBe(1234);
     expect(txn!.categoryId).toBeNull();
+  });
+
+  it('signs a contribution as positive income when the investment account sends a transient empty payload (sticky type)', () => {
+    // BUG-FIX PROOF: with holdings:[] this run, only prior-investment stickiness
+    // keeps accountType === 'investment', so the contribution branch fires.
+    // WITHOUT the fix the account types 'other' and the txn stays -176250 / null.
+    const { transactions } = normalizeForSync(
+      setOf(account('ACT-401k', { holdings: [], transactions: [contribution] })),
+      { household: HOUSEHOLD, now: NOW, priorInvestmentIds: new Set(['ACT-401k']) },
+    );
+    const txn = transactions.find((t) => t.simplefinTxnId === 'TXN-contrib');
+    expect(txn).toBeDefined();
+    expect(txn!.amountMinor).toBe(176250); // positive, not -176250
+    expect(txn!.amountRaw).toBe('1762.50');
+    expect(txn!.categoryId).toBe(RETIREMENT_CONTRIBUTIONS_CATEGORY_ID);
+    expect(txn!.isTransfer).toBe(false);
   });
 });

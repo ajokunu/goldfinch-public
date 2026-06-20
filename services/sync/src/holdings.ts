@@ -255,19 +255,42 @@ export async function ingestHoldings(
   return result;
 }
 
+/** Prior per-account sync state, keyed by simplefinAccountId. */
+export interface PriorAccountState {
+  /**
+   * holdingsSupported flag per account. Sticky-true ("ever returned a holdings
+   * array"); applyHoldingsSupported merges it onto the fresh items so the P8-4
+   * account writer SETs the merged value and never REMOVEs the flag.
+   */
+  holdingsSupported: Map<string, boolean>;
+  /**
+   * Account ids whose stored synced `accountType` was 'investment'. Feeds
+   * NormalizeContext.priorInvestmentIds so investment classification is sticky
+   * across runs: a transient empty/absent holdings payload no longer flips a
+   * known investment account back to 'other' (which would also mis-sign that
+   * run's 401k contribution as spend). Read from the SAME stored `accountType`
+   * field the contribution branch keys off (api.ts:116) -- NOT accountTypeId /
+   * the effective type -- so classification and contribution-signing stay
+   * consistent run to run.
+   */
+  investmentIds: Set<string>;
+}
+
 /**
- * Prior holdingsSupported flags by simplefinAccountId, read BEFORE the upsert
- * pass so applyHoldingsSupported can merge the sticky flag onto the fresh
- * items (the P8-4 account writer SETs whatever rides the item and never
- * REMOVEs the flag). One small begins_with Query per run.
+ * Prior per-account state by simplefinAccountId, read BEFORE the upsert pass in
+ * a single begins_with Query over the ACCT# rows. Returns both the sticky
+ * holdingsSupported flags (merged onto fresh items by applyHoldingsSupported)
+ * and the set of previously-investment account ids (sticky classification fed
+ * into normalizeForSync). One small begins_with Query per run.
  */
-export async function loadHoldingsSupportFlags(
+export async function loadPriorAccountState(
   docClient: DocClient,
   tableName: string,
   household: string,
-): Promise<Map<string, boolean>> {
+): Promise<PriorAccountState> {
   const pk = userPk(household);
-  const flags = new Map<string, boolean>();
+  const holdingsSupported = new Map<string, boolean>();
+  const investmentIds = new Set<string>();
   let exclusiveStartKey: Record<string, unknown> | undefined;
   do {
     const response = await docClient.send(
@@ -281,12 +304,18 @@ export async function loadHoldingsSupportFlags(
     for (const raw of response.Items ?? []) {
       const account = raw as unknown as AccountItem;
       if (typeof account.simplefinAccountId === 'string') {
-        flags.set(account.simplefinAccountId, account.holdingsSupported === true);
+        holdingsSupported.set(
+          account.simplefinAccountId,
+          account.holdingsSupported === true,
+        );
+        if (account.accountType === 'investment') {
+          investmentIds.add(account.simplefinAccountId);
+        }
       }
     }
     exclusiveStartKey = response.LastEvaluatedKey as Record<string, unknown> | undefined;
   } while (exclusiveStartKey !== undefined);
-  return flags;
+  return { holdingsSupported, investmentIds };
 }
 
 /**

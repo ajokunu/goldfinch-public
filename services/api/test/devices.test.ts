@@ -51,6 +51,9 @@ describe('POST /devices/push-token', () => {
     [{ ...GOOD_BODY, platform: undefined }],
     [{ ...GOOD_BODY, deviceId: '' }],
     [{ deviceId: 'd', platform: 'ios' }],
+    [{ ...GOOD_BODY, expoPushToken: 'not-a-token' }],
+    [{ ...GOOD_BODY, expoPushToken: 'ExponentPushToken[]' }],
+    [{ ...GOOD_BODY, expoPushToken: '' }],
   ])('rejects malformed registrations with 400 (%#)', async (body) => {
     const res = await handler(registerEvent(body));
     expect(res.statusCode).toBe(400);

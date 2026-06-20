@@ -26,7 +26,7 @@ import {
   normalizeTransaction,
 } from '@goldfinch/shared/simplefin';
 import { isLiabilityType } from '@goldfinch/shared/types';
-import type { TxnPointerItem } from '@goldfinch/shared/types';
+import type { AccountType, TxnPointerItem } from '@goldfinch/shared/types';
 
 import type { SyncAccountItem, SyncTransactionItem } from './types.js';
 
@@ -50,10 +50,37 @@ export function normalizeForSync(
 
   for (const account of accountSet.accounts) {
     const base = normalizeAccount(account, ctx);
+    // Durable investment classification: SimpleFIN exposes no account type, so
+    // we derive it from actual holdings. The MX/SimpleFIN bridge attaches an
+    // EMPTY `holdings: []` to ordinary bank and card accounts, so mere presence
+    // of the array is NOT a signal -- only an account that actually holds at
+    // least one position is an investment account. This is the single
+    // derivation; the Investments tab never has to be hand-fed account ids. An
+    // explicit ACCOUNT_TYPES_JSON mapping still wins (admin override), and the
+    // P8-4 user `typeOverride` still wins at the effective-type layer.
+    //
+    // Classification is STICKY across runs: a transient payload that drops the
+    // holdings array (empty or absent) must NOT flip a known investment account
+    // back to 'other'. priorInvestmentIds carries the prior stored accountType
+    // classification (read from the ACCT# rows in the handler), so a
+    // previously-investment account stays investment. Stickiness derives from
+    // the prior accountType -- NEVER from holdingsSupported -- so an ordinary
+    // bank/card that has only ever sent holdings:[] is never made investment.
+    const reportsHoldings = Array.isArray(account.holdings) && account.holdings.length > 0;
+    const hasConfiguredType = ctx.accountTypes?.[account.id] !== undefined;
+    const wasInvestment = ctx.priorInvestmentIds?.has(account.id) === true;
+    const accountType: AccountType = hasConfiguredType
+      ? base.accountType // ACCOUNT_TYPES_JSON / typeOverride config wins
+      : reportsHoldings
+        ? 'investment' // live positions this run
+        : wasInvestment
+          ? 'investment' // sticky: stayed investment from a prior run
+          : base.accountType; // default 'other' (banks/cards w/ holdings:[])
     const enriched: SyncAccountItem = {
       ...base,
+      accountType,
       balanceRaw: account.balance,
-      isLiability: isLiabilityType(base.accountType),
+      isLiability: isLiabilityType(accountType),
     };
     const availableRaw = account['available-balance'];
     if (availableRaw !== undefined) {

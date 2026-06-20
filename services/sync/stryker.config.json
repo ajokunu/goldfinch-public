@@ -1,0 +1,36 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-js/master/packages/api/schema/stryker-core.json",
+  "scope_comment": [
+    "Minimal mutation gate for the highest-stakes sync money logic:",
+    "src/normalize.ts only -- the durable investment classification",
+    "(holdings-length + ACCOUNT_TYPES override precedence) and the",
+    "retirement-contribution sign-flip/categorize/transfer-clear. Mutate",
+    "ONLY normalize.ts; the rest of src/ (handler/writer/holdings/client)",
+    "does DynamoDB + network IO and is integration-tested, not unit-mutated.",
+    "normalizeAccount/normalizeTransaction live in @goldfinch/shared and are",
+    "gated by that package's own stryker config, not here."
+  ],
+  "mutate": ["src/normalize.ts"],
+  "runner_comment": [
+    "This workspace tests with Vitest (npm test = `vitest run`), so we use the",
+    "Stryker vitest runner -- it instruments and runs the TS tests through vite",
+    "directly, so unlike the node:test workspaces (packages/shared, app) there",
+    "is no tsc buildCommand or self-contained tsconfig.stryker.json to maintain."
+  ],
+  "testRunner": "vitest",
+  "vitest": { "configFile": "vitest.config.ts" },
+  "coverageAnalysis": "perTest",
+  "incremental": true,
+  "incrementalFile": "reports/stryker-incremental.json",
+  "thresholds_comment": [
+    "Modest/achievable for a first run over a small (8-test) suite; raise by",
+    "strengthening tests, never lower to mask survivors."
+  ],
+  "thresholds": { "high": 85, "low": 70, "break": 60 },
+  "reporters": ["clear-text", "progress", "html", "json"],
+  "htmlReporter": { "fileName": "reports/mutation/mutation.html" },
+  "jsonReporter": { "fileName": "reports/mutation/mutation.json" },
+  "ignorePatterns": ["dist", "reports", "*.tsbuildinfo"],
+  "tempDirName": ".stryker-tmp",
+  "cleanTempDir": true
+}

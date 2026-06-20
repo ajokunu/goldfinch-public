@@ -329,6 +329,14 @@ export interface NormalizeContext {
    * GoldFinch account types here (seeded config). Unmapped accounts get "other".
    */
   accountTypes?: Record<string, AccountType>;
+  /**
+   * SimpleFIN account ids that were classified `investment` on a PRIOR run
+   * (read from the stored ACCT# rows). Investment classification is sticky: a
+   * previously-investment account stays investment even when a transient
+   * payload carries an empty/absent holdings array. Keyed by SimpleFIN account
+   * id (== AccountItem.simplefinAccountId; see normalizeAccount line ~390).
+   */
+  priorInvestmentIds?: ReadonlySet<string>;
 }
 
 export interface NormalizedTransaction {

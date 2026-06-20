@@ -7,5 +7,5 @@
     "declaration": false,
     "sourceMap": false
   },
-  "include": ["lib/sections.ts", "lib/display.ts", "test/**/*"]
+  "include": ["lib/sections.ts", "lib/display.ts", "lib/cachePatch.ts", "test/**/*"]
 }

@@ -20,6 +20,7 @@
  *                                color precedence helper (P10-1/P10-2/P10-4)
  *   @goldfinch/shared/periodWindow current weekly/monthly/yearly budget window
  *                                in DEFAULT_TZ (P11-2)
+ *   @goldfinch/shared/push       Expo push-token format guard (P7-8)
  */
 
 export * from './types/index.js';
@@ -38,3 +39,4 @@ export * from './accountTypes.js';
 export * from './categoryStyle.js';
 export * from './profile.js';
 export * from './periodWindow.js';
+export * from './push.js';

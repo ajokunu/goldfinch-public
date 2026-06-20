@@ -21,7 +21,7 @@ import { ddb } from '../ddb.js';
 import { nowIso } from '../dates.js';
 import { getEnv } from '../env.js';
 import { ApiError, json, noContent, parseJsonBody, requirePathParam } from '../http.js';
-import { reqString } from '../validate.js';
+import { reqExpoPushToken, reqString } from '../validate.js';
 
 const PLATFORMS: readonly PushPlatform[] = ['ios', 'android', 'web'];
 
@@ -33,7 +33,7 @@ export async function registerPushToken(
   const body = parseJsonBody(event);
 
   const deviceId = reqString(body, 'deviceId');
-  const expoPushToken = reqString(body, 'expoPushToken');
+  const expoPushToken = reqExpoPushToken(body, 'expoPushToken');
   const platform = body['platform'];
   if (typeof platform !== 'string' || !PLATFORMS.includes(platform as PushPlatform)) {
     throw new ApiError(

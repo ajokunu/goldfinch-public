@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyHoldingsSupported,
   ingestHoldings,
-  loadHoldingsSupportFlags,
+  loadPriorAccountState,
 } from '../src/holdings.js';
 import type { SyncAccountItem } from '../src/types.js';
 import { captureLogger } from './capture-logger.js';
@@ -208,7 +208,7 @@ describe('holdingsSupported flag', () => {
     expect(item.holdingsSupported).toBe(true);
   });
 
-  it('round-trips through the table via loadHoldingsSupportFlags', async () => {
+  it('round-trips through the table via loadPriorAccountState', async () => {
     const ddb = new FakeDdb();
     ddb.putItem({
       PK,
@@ -216,6 +216,7 @@ describe('holdingsSupported flag', () => {
       entityType: 'ACCOUNT',
       simplefinAccountId: 'ACT-invest-1',
       holdingsSupported: true,
+      accountType: 'investment',
     });
     ddb.putItem({
       PK,
@@ -223,10 +224,42 @@ describe('holdingsSupported flag', () => {
       entityType: 'ACCOUNT',
       simplefinAccountId: 'ACT-checking-1',
       holdingsSupported: false,
+      accountType: 'checking',
+    });
+    // DISCRIMINATING fixtures: holdingsSupported is DECOUPLED from accountType,
+    // so this test fails if the loader keys investmentIds off holdingsSupported
+    // (the bug) instead of the stored accountType (the contract).
+    //  - a bank/card that reports an empty holdings array (holdingsSupported=true)
+    //    but was never investment -> MUST be excluded.
+    ddb.putItem({
+      PK,
+      SK: 'ACCT#ACT-bank-holds',
+      entityType: 'ACCOUNT',
+      simplefinAccountId: 'ACT-bank-holds',
+      holdingsSupported: true,
+      accountType: 'other',
+    });
+    //  - an investment account whose latest payload dropped holdings
+    //    (holdingsSupported=false) -> MUST still be included.
+    ddb.putItem({
+      PK,
+      SK: 'ACCT#ACT-invest-nohold',
+      entityType: 'ACCOUNT',
+      simplefinAccountId: 'ACT-invest-nohold',
+      holdingsSupported: false,
+      accountType: 'investment',
     });
 
-    const flags = await loadHoldingsSupportFlags(ddb.asDocClient(), TABLE_NAME, HOUSEHOLD);
-    expect(flags.get('ACT-invest-1')).toBe(true);
-    expect(flags.get('ACT-checking-1')).toBe(false);
+    const state = await loadPriorAccountState(ddb.asDocClient(), TABLE_NAME, HOUSEHOLD);
+    expect(state.holdingsSupported.get('ACT-invest-1')).toBe(true);
+    expect(state.holdingsSupported.get('ACT-checking-1')).toBe(false);
+    // investmentIds keys off the stored accountType === 'investment', NOT
+    // holdingsSupported.
+    expect(state.investmentIds.has('ACT-invest-1')).toBe(true);
+    expect(state.investmentIds.has('ACT-checking-1')).toBe(false);
+    // The decoupling: holdingsSupported=true + accountType!='investment' is OUT;
+    // holdingsSupported=false + accountType='investment' is IN.
+    expect(state.investmentIds.has('ACT-bank-holds')).toBe(false);
+    expect(state.investmentIds.has('ACT-invest-nohold')).toBe(true);
   });
 });

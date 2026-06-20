@@ -10,6 +10,7 @@ import {
   isGlyphKey,
 } from '@goldfinch/shared/categoryStyle';
 import { MAX_TEXT_LENGTHS, type MaxTextLengthField } from '@goldfinch/shared/constants';
+import { isExpoPushToken } from '@goldfinch/shared/push';
 import {
   BUDGET_PERIODS,
   type BudgetPeriod,
@@ -229,6 +230,20 @@ export function optBudgetPeriod(
       `${field} must be a known budget period`,
       { valid: [...BUDGET_PERIODS] },
     );
+  }
+  return value;
+}
+
+/**
+ * Required Expo push token; format validated via the shared {@link isExpoPushToken}
+ * guard so request validation cannot drift from the relay contract. Subsumes the
+ * non-empty check (an empty/non-string value fails the guard), so it is a
+ * drop-in replacement for reqString on the push-token field.
+ */
+export function reqExpoPushToken(body: Record<string, unknown>, field: string): string {
+  const value = body[field];
+  if (!isExpoPushToken(value)) {
+    throw new ApiError(400, 'VALIDATION_ERROR', `${field} must be a valid Expo push token`);
   }
   return value;
 }

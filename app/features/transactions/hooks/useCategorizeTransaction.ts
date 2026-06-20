@@ -14,21 +14,19 @@
 import {
   useMutation,
   useQueryClient,
-  type InfiniteData,
   type QueryKey,
 } from '@tanstack/react-query';
 import type {
   IsoDate,
-  ListTransactionsResponse,
   PatchTransactionCategoryRequest,
   PatchTransactionCategoryResponse,
-  TransactionDto,
 } from '@goldfinch/shared/types';
 
 import { patchTransactionCategory } from '../../../src/api/endpoints';
 import { ApiError } from '../../../src/api/errors';
 import { queryKeys } from '../../../src/api/queryKeys';
 import { logger } from '../../../src/lib/logger';
+import { patchCachedTransaction, type TransactionListData } from '../lib/cachePatch';
 
 export interface CategorizeTransactionVars {
   txnId: string;
@@ -48,45 +46,10 @@ export interface CategorizeTransactionVars {
   version: number;
 }
 
-type TransactionListData = InfiniteData<ListTransactionsResponse, string | undefined>;
-
 type Snapshot = Array<[QueryKey, TransactionListData | undefined]>;
 
 export interface CategorizeContext {
   snapshot: Snapshot;
-}
-
-function patchCachedTransaction(
-  data: TransactionListData,
-  vars: CategorizeTransactionVars,
-): TransactionListData {
-  return {
-    ...data,
-    pages: data.pages.map((page) => {
-      if (!page.items.some((txn) => txn.txnId === vars.txnId)) return page;
-      return {
-        ...page,
-        items: page.items.map((txn): TransactionDto => {
-          if (txn.txnId !== vars.txnId) return txn;
-          return {
-            ...txn,
-            // Category fields only move on a category (re)assignment; a
-            // note-only edit must NOT flip an uncategorized row to categorized
-            // in the cache.
-            ...(vars.categoryId !== undefined
-              ? {
-                  categoryId: vars.categoryId,
-                  userCategorized: true,
-                  categorizedBy: 'user' as const,
-                }
-              : {}),
-            note: vars.note !== undefined ? vars.note : txn.note,
-            version: txn.version + 1,
-          };
-        }),
-      };
-    }),
-  };
 }
 
 export function isVersionConflict(error: unknown): boolean {

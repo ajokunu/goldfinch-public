@@ -35,6 +35,7 @@
     "src/ui/motion/countUpMath.ts",
     "features/transactions/lib/sections.ts",
     "features/transactions/lib/display.ts",
+    "features/transactions/lib/cachePatch.ts",
     "features/goals/lib/totals.ts",
     "features/budget/lib/amounts.ts",
     "features/dashboard/lib/heroMath.ts",

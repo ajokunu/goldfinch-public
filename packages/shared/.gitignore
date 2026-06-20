@@ -4,3 +4,7 @@
 .stryker-tmp/
 reports/
 stryker.log
+
+# tsc test-compile output (npm test: `tsc -p tsconfig.test.json` into dist-test, then node --test).
+# Build artifact, regenerated every test run; `npm run clean` removes it. Never commit.
+dist-test/

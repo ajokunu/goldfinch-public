@@ -4,8 +4,12 @@
     "Mutation testing for the highest-stakes pure logic in @goldfinch/shared",
     "(PHASE7-DECISIONS.md P7-10): money, keys, dates, cursor, recurrence,",
     "rules, budgetMath, csv; plus accountTypes (P8-4 effective-type",
-    "precedence). Deliberately NOT mutated: simplefin.ts (network",
-    "client, integration-tested elsewhere), logger.ts (I/O), constants.ts",
+    "precedence). simplefin.ts's PURE date-bucketing logic IS now mutated",
+    "(epochToIsoDate + the normalizeTransaction skDate/postedDate region,",
+    "gated by test/simplefin.test.ts); the network client",
+    "(decodeSetupToken/parseAccessUrl/fetchAccounts) and the untested",
+    "normalizeAccount/normalizeAccountSet remain excluded as integration-",
+    "tested elsewhere. Also NOT mutated: logger.ts (I/O), constants.ts",
     "(the API_ROUTES manifest is locked by the infra parity test), types/",
     "(erased at runtime), internal/sha256.ts (locked by FIPS vectors in",
     "csv.test.ts; mutating a hash primitive only proves hashes change)."
@@ -22,7 +26,10 @@
     "src/accountTypes.ts",
     "src/categoryStyle.ts",
     "src/profile.ts",
-    "src/periodWindow.ts"
+    "src/periodWindow.ts",
+    "src/simplefin.ts:364-372",
+    "src/simplefin.ts:436-441",
+    "src/simplefin.ts:459-459"
   ],
   "runner_comment": [
     "This workspace tests with node:test (npm test = tsc + node --test), so we",

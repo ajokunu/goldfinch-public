@@ -79,12 +79,10 @@ export class ExpoPushError extends Error {
   }
 }
 
-const EXPO_PUSH_TOKEN_PATTERN = /^Expo(nent)?PushToken\[[^\]\s]+\]$/;
-
-/** True for "ExponentPushToken[...]" / "ExpoPushToken[...]" strings. */
-export function isExpoPushToken(token: unknown): token is string {
-  return typeof token === 'string' && EXPO_PUSH_TOKEN_PATTERN.test(token);
-}
+// The Expo token format guard lives in @goldfinch/shared/push so the API write
+// path and this fan-out cannot drift; re-exported here so send.ts/index.ts keep
+// importing it from './expo.js'.
+export { EXPO_PUSH_TOKEN_PATTERN, isExpoPushToken } from '@goldfinch/shared/push';
 
 export function chunk<T>(items: readonly T[], size: number): T[][] {
   if (!Number.isSafeInteger(size) || size <= 0) {
