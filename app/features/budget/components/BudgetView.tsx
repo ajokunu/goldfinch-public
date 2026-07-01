@@ -13,7 +13,7 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ChartPie, Plus, Tag } from 'lucide-react-native';
-import { stepWeek } from '@goldfinch/shared/periodWindow';
+import { periodWindow, stepWeek } from '@goldfinch/shared/periodWindow';
 import type {
   BudgetDto,
   BudgetPeriod,
@@ -567,13 +567,19 @@ export function BudgetView({ now }: BudgetViewProps = {}) {
         target={editorTarget}
         onClose={() => setEditorTarget(null)}
       />
-      {/* Section 9.3 C: in range mode the drill-down opens the category's
-          transactions for the SAME [from,to] the row's spend was computed over;
-          otherwise the current month. */}
+      {/* The drill-down must list the SAME window the row's spend was computed
+          over. Weekly always scopes to its week (incl. the current week, delta
+          0 -- the default month fallback would otherwise leak prior weeks in);
+          a month/year preset scopes to that range; the yearly tab's default
+          scopes to the current year; the monthly default falls through to the
+          month below. */}
       <CategoryTransactionsModal
         target={txnTarget}
         month={month}
-        range={rangeActive ? activeWindow : undefined}
+        range={
+          activeWindow ??
+          (periodTab === 'yearly' ? periodWindow('yearly', anchor) : undefined)
+        }
         currency={currency}
         onClose={() => setTxnTarget(null)}
       />

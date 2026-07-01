@@ -206,6 +206,34 @@ describe('Budget screen', () => {
     expect(screen.queryByText('No budgets yet')).toBeNull();
   });
 
+  it('scopes the weekly-tab drill-down to the current week, not the whole month', async () => {
+    // Regression: on the Week tab at the current week (weekDelta 0) the
+    // drill-down fell back to monthDateRange(month) and listed the WHOLE month,
+    // leaking prior weeks' transactions into "this week". It must request the
+    // same current-week window the weekly row's spend is computed over.
+    const week = stepWeek(new Date(), 0); // current ISO week, Mon..Sun
+
+    let txnQuery: URLSearchParams | undefined;
+    mockApi.on('GET', '/transactions', (request) => {
+      txnQuery = request.query;
+      return { status: 200, body: listOf([]) };
+    });
+    mockApi.get('/budgets', listOf([weeklyFoodBudget]));
+    mockApi.get('/categories', listOf([groceriesCategory]));
+    mockApi.get('/cashflow', cashflow);
+
+    renderWithProviders(<BudgetScreen />);
+
+    // Week tab, then open the Groceries drill-down (the current-week view).
+    fireEvent.press(await screen.findByText('Weekly'));
+    fireEvent.press(await screen.findByText('Groceries'));
+
+    await waitFor(() => expect(txnQuery).toBeDefined());
+    // The drill-down window is the current week, not the calendar month.
+    expect(txnQuery!.get('from')).toBe(week.from);
+    expect(txnQuery!.get('to')).toBe(week.to);
+  });
+
   it('creates a budget with the active tab period in the request body', async () => {
     // Groceries already has a (weekly) budget, so Rent is the unbudgeted row.
     mockApi.get('/budgets', listOf([weeklyFoodBudget]));
